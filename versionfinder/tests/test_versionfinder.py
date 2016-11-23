@@ -41,11 +41,9 @@ import pytest
 import sys
 import os
 import subprocess
-import shutil
 from textwrap import dedent
 from pip._vendor.packaging.version import Version
 
-from versionfinder.version import VERSION
 import versionfinder.versionfinder
 from versionfinder.versionfinder import (
     _get_git_commit, _get_git_url, _get_git_tag, _check_output, DEVNULL,
@@ -69,61 +67,507 @@ pbm = 'versionfinder.versionfinder'
 pb = '%s.VersionFinder' % pbm
 
 
-class Test_Init(object):
+class TestInit(object):
 
     def test_init(self):
-        cls = VersionFinder('foobar')
+        with patch('%s.inspect.stack' % pbm, autospec=True) as m_stack:
+            cls = VersionFinder('foobar', package_file='/foo/bar/baz.py')
+        assert m_stack.mock_calls == []
         assert cls.package_name == 'foobar'
+        assert cls.package_file == '/foo/bar/baz.py'
+        assert cls.package_dir == '/foo/bar'
+
+    def test_init_no_file(self):
+        m_frame = Mock()
+        type(m_frame).filename = '/tmp/foo.py'
+        with patch('%s.inspect.stack' % pbm, autospec=True) as m_stack:
+            m_stack.return_value = [None, m_frame]
+            cls = VersionFinder('foobar')
+        assert m_stack.mock_calls == [call()]
+        assert cls.package_name == 'foobar'
+        assert cls.package_file == '/tmp/foo.py'
+        assert cls.package_dir == '/tmp'
 
 
-class Test_VersionFinder(object):
-    """
-    Mocked unit tests for VersionFinder
-    """
+class TestFindPackageVersion(object):
+
+    def setup_method(self, _):
+        self.cls = VersionFinder('foo', package_file='/foo/bar/baz.py')
+
+    def test_git_notag(self):
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': 'git+https://foo',
+                'tag': None,
+                'commit': '12345678',
+                'dirty': False
+            }
+            mocks['_find_pip_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pip'
+            }
+            mocks['_find_pkg_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pkg_resources'
+            }
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = True
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'git+https://foo',
+            'tag': None,
+            'commit': '12345678',
+            'dirty': False,
+        }
+        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_git_notag_dirty(self):
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': 'git+https://foo',
+                'tag': None,
+                'commit': '12345678',
+                'dirty': True
+            }
+            mocks['_find_pip_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pip'
+            }
+            mocks['_find_pkg_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pkg_resources'
+            }
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = True
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'git+https://foo',
+            'tag': None,
+            'commit': '12345678*',
+            'dirty': True,
+        }
+        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_git_tag(self):
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': 'git+https://foo',
+                'tag': 'mytag',
+                'commit': '12345678',
+                'dirty': False
+            }
+            mocks['_find_pip_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pip'
+            }
+            mocks['_find_pkg_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pkg_resources'
+            }
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = True
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'git+https://foo',
+            'tag': 'mytag',
+            'commit': '12345678',
+            'dirty': False,
+        }
+        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_git_tag_dirty(self):
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': 'git+https://foo',
+                'tag': 'mytag',
+                'commit': '12345678',
+                'dirty': True
+            }
+            mocks['_find_pip_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pip'
+            }
+            mocks['_find_pkg_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pkg_resources'
+            }
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = True
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'git+https://foo',
+            'tag': 'mytag*',
+            'commit': '12345678*',
+            'dirty': True,
+        }
+        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_pkg_res_exception(self):
+
+        def se_exception():
+            raise Exception("some exception")
+
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': 'git+https://foo',
+                'tag': None,
+                'commit': '12345678',
+                'dirty': False
+            }
+            mocks['_find_pip_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pip'
+            }
+            mocks['_find_pkg_info'].side_effect = se_exception
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = True
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'git+https://foo',
+            'tag': None,
+            'commit': '12345678',
+            'dirty': False,
+        }
+        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_pip_exception(self):
+
+        def se_exception():
+            raise Exception("some exception")
+
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': 'git+https://foo',
+                'tag': None,
+                'commit': '12345678',
+                'dirty': False
+            }
+            mocks['_find_pip_info'].side_effect = se_exception
+            mocks['_find_pkg_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pkg_resources'
+            }
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = True
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'git+https://foo',
+            'tag': None,
+            'commit': '12345678',
+            'dirty': False,
+        }
+        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_no_git(self):
+
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': None,
+                'tag': None,
+                'commit': None,
+                'dirty': None,
+            }
+            mocks['_find_pip_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pip'
+            }
+            mocks['_find_pkg_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pkg_resources'
+            }
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = False
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'http://my.package.url/pip',
+            'tag': None,
+            'commit': None,
+        }
+        assert mocks['_find_git_info'].mock_calls == []
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_no_git_no_pip(self):
+
+        def se_exception():
+            raise Exception("some exception")
+
+        with patch.multiple(
+                pb,
+                autospec=True,
+                _find_git_info=DEFAULT,
+                _find_pip_info=DEFAULT,
+                _find_pkg_info=DEFAULT,
+        ) as mocks:
+            mocks['_find_git_info'].return_value = {
+                'url': None,
+                'tag': None,
+                'commit': None,
+                'dirty': None,
+            }
+            mocks['_find_pip_info'].side_effect = se_exception
+            mocks['_find_pkg_info'].return_value = {
+                'version': '1.2.3',
+                'url': 'http://my.package.url/pkg_resources'
+            }
+            with patch('%s._is_git_clone' % pb,
+                       new_callable=PropertyMock) as mock_is_git:
+                mock_is_git.return_value = False
+                res = self.cls.find_package_version()
+        assert res == {
+            'version': '1.2.3',
+            'url': 'http://my.package.url/pkg_resources',
+            'tag': None,
+            'commit': None,
+        }
+        assert mocks['_find_git_info'].mock_calls == []
+        assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_debug(self):
+        mock_pip_logger = Mock(spec_set=logging.Logger)
+
+        with patch.dict('%s.os.environ' % pbm,
+                        {'VERSIONCHECK_DEBUG': 'true'}):
+            with patch('%s.logging' % pbm) as mock_logging:
+                with patch.multiple(
+                        pb,
+                        autospec=True,
+                        _find_git_info=DEFAULT,
+                        _find_pip_info=DEFAULT,
+                        _find_pkg_info=DEFAULT,
+                ) as mocks:
+                    mocks['_find_git_info'].return_value = {
+                        'url': None,
+                        'tag': None,
+                        'commit': None,
+                        'dirty': None,
+                    }
+                    mocks['_find_pip_info'].return_value = {
+                        'version': '1.2.3',
+                        'url': 'http://my.package.url/pip'
+                    }
+                    mocks['_find_pkg_info'].return_value = {
+                        'version': '1.2.3',
+                        'url': 'http://my.package.url/pkg_resources'
+                    }
+                    with patch('%s.logger' % pbm,
+                               spec_set=logging.Logger) as mock_mod_logger:
+                        mock_logging.getLogger.return_value = mock_pip_logger
+                        with patch('%s._is_git_clone' % pb,
+                                   new_callable=PropertyMock) as mock_is_git:
+                            mock_is_git.return_value = False
+                            self.cls.find_package_version()
+        assert mock_logging.mock_calls == []
+        assert mock_pip_logger.mock_calls == []
+        assert mock_mod_logger.mock_calls == [
+            call.debug('Install does not appear to be a git clone'),
+            call.debug('pip info: %s', {'url': 'http://my.package.url/pip',
+                                        'version': '1.2.3'}),
+            call.debug('pkg_resources info: %s',
+                       {'url': 'http://my.package.url/pkg_resources',
+                        'version': '1.2.3'}),
+            call.debug('Final package info: %s',
+                       {'url': 'http://my.package.url/pip', 'commit': None,
+                        'version': '1.2.3', 'tag': None})
+        ]
+        assert mock_is_git.mock_calls == [call()]
+
+    def test_no_debug(self):
+        mock_pip_logger = Mock()
+        type(mock_pip_logger).propagate = False
+
+        with patch.dict('%s.os.environ' % pbm,
+                        {'VERSIONCHECK_DEBUG': 'false'}):
+            with patch('%s.logging' % pbm) as mock_logging:
+                mock_logging.getLogger.return_value = mock_pip_logger
+                with patch.multiple(
+                        pb,
+                        autospec=True,
+                        _find_git_info=DEFAULT,
+                        _find_pip_info=DEFAULT,
+                        _find_pkg_info=DEFAULT,
+                ) as mocks:
+                    mocks['_find_git_info'].return_value = {
+                        'url': None,
+                        'tag': None,
+                        'commit': None,
+                        'dirty': None,
+                    }
+                    mocks['_find_pip_info'].return_value = {
+                        'version': '1.2.3',
+                        'url': 'http://my.package.url/pip'
+                    }
+                    mocks['_find_pkg_info'].return_value = {
+                        'version': '1.2.3',
+                        'url': 'http://my.package.url/pkg_resources'
+                    }
+                    with patch('%s.logger' % pbm,
+                               spec_set=logging.Logger) as mock_mod_logger:
+                        with patch('%s._is_git_clone' % pb,
+                                   new_callable=PropertyMock) as mock_is_git:
+                            mock_is_git.return_value = False
+                            self.cls.find_package_version()
+        assert mock_logging.mock_calls == [
+            call.getLogger("pip"),
+            call.getLogger().setLevel(mock_logging.WARNING)
+        ]
+        assert mock_pip_logger.mock_calls == [
+            call.setLevel(mock_logging.WARNING),
+        ]
+        assert mock_mod_logger.mock_calls == [
+            call.setLevel(mock_logging.WARNING),
+            call.debug('Install does not appear to be a git clone'),
+            call.debug('pip info: %s', {'url': 'http://my.package.url/pip',
+                                        'version': '1.2.3'}),
+            call.debug('pkg_resources info: %s',
+                       {'url': 'http://my.package.url/pkg_resources',
+                        'version': '1.2.3'}),
+            call.debug('Final package info: %s',
+                       {'url': 'http://my.package.url/pip', 'commit': None,
+                        'version': '1.2.3', 'tag': None})
+        ]
+        assert mock_is_git.mock_calls == [call()]
+
+
+class TestIsGitDirty(object):
+
+    def setup_method(self, _):
+        self.cls = VersionFinder('foo', package_file='/foo/bar/baz.py')
 
     def test_is_git_dirty_false(self):
-        cls = VersionFinder()
-        with patch('%s._check_output' % self.mpb) as mock_check_out:
-            mock_check_out.return_value = dedent("""
-            On branch current_module
-            Your branch is up-to-date with 'origin/current_module'.
-            nothing to commit, working directory clean
-            """)
-            res = cls._is_git_dirty()
+        with patch('%s._check_output' % pbm) as mock_check_out:
+            with patch('%s.chdir' % pbm) as mock_chdir:
+                mock_check_out.return_value = dedent("""
+                On branch current_module
+                Your branch is up-to-date with 'origin/current_module'.
+                nothing to commit, working directory clean
+                """)
+                res = self.cls._is_git_dirty()
         assert res is False
+        assert mock_chdir.mock_calls == [
+            call('/foo/bar'),
+            call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
         assert mock_check_out.mock_calls == [
             call(['git', 'status', '-u'], stderr=DEVNULL)
         ]
 
     def test_is_git_dirty_false_detatched(self):
-        cls = VersionFinder()
-        with patch('%s._check_output' % self.mpb) as mock_check_out:
-            mock_check_out.return_value = dedent("""
-            HEAD detached at 9247d43
-            nothing to commit, working directory clean
-            """)
-            res = cls._is_git_dirty()
+        with patch('%s.chdir' % pbm) as mock_chdir:
+            with patch('%s._check_output' % pbm) as mock_check_out:
+                mock_check_out.return_value = dedent("""
+                HEAD detached at 9247d43
+                nothing to commit, working directory clean
+                """)
+                res = self.cls._is_git_dirty()
         assert res is False
+        assert mock_chdir.mock_calls == [
+            call('/foo/bar'),
+            call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
         assert mock_check_out.mock_calls == [
             call(['git', 'status', '-u'], stderr=DEVNULL)
         ]
 
     def test_is_git_dirty_false_no_branch(self):
-        cls = VersionFinder()
-        with patch('%s._check_output' % self.mpb) as mock_check_out:
-            mock_check_out.return_value = dedent("""
-            Not currently on any branch.
-            nothing to commit, working directory clean
-            """)
-            res = cls._is_git_dirty()
+        with patch('%s.chdir' % pbm) as mock_chdir:
+            with patch('%s._check_output' % pbm) as mock_check_out:
+                mock_check_out.return_value = dedent("""
+                Not currently on any branch.
+                nothing to commit, working directory clean
+                """)
+                res = self.cls._is_git_dirty()
         assert res is False
+        assert mock_chdir.mock_calls == [
+            call('/foo/bar'),
+            call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
         assert mock_check_out.mock_calls == [
             call(['git', 'status', '-u'], stderr=DEVNULL)
         ]
 
     def test_is_git_dirty_true_ahead(self):
-        cls = VersionFinder()
-        with patch('%s._check_output' % self.mpb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = dedent("""
             On branch issues/8
             Your branch is ahead of 'origin/issues/8' by 1 commit.
@@ -137,15 +581,20 @@ class Test_VersionFinder(object):
 
             no changes added to commit (use "git add" and/or "git commit -a")
             """)
-            res = cls._is_git_dirty()
+            with patch('%s.chdir' % pbm) as mock_chdir:
+                res = self.cls._is_git_dirty()
         assert res is True
+        assert mock_chdir.mock_calls == [
+            call('/foo/bar'),
+            call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
         assert mock_check_out.mock_calls == [
             call(['git', 'status', '-u'], stderr=DEVNULL)
         ]
 
     def test_is_git_dirty_true_detatched(self):
-        cls = VersionFinder()
-        with patch('%s._check_output' % self.mpb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = dedent("""
             HEAD detached at 9247d43
             Untracked files:
@@ -155,15 +604,20 @@ class Test_VersionFinder(object):
 
             nothing added to commit but untracked files present
             """)
-            res = cls._is_git_dirty()
+            with patch('%s.chdir' % pbm) as mock_chdir:
+                res = self.cls._is_git_dirty()
         assert res is True
+        assert mock_chdir.mock_calls == [
+            call('/foo/bar'),
+            call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
         assert mock_check_out.mock_calls == [
             call(['git', 'status', '-u'], stderr=DEVNULL)
         ]
 
     def test_is_git_dirty_true_changes(self):
-        cls = VersionFinder()
-        with patch('%s._check_output' % self.mpb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = dedent("""
             On branch issues/8
             Your branch is up-to-date with 'origin/issues/8'.
@@ -176,30 +630,76 @@ class Test_VersionFinder(object):
 
             no changes added to commit (use "git add" and/or "git commit -a")
             """)
-            res = cls._is_git_dirty()
+            with patch('%s.chdir' % pbm) as mock_chdir:
+                res = self.cls._is_git_dirty()
         assert res is True
+        assert mock_chdir.mock_calls == [
+            call('/foo/bar'),
+            call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
         assert mock_check_out.mock_calls == [
             call(['git', 'status', '-u'], stderr=DEVNULL)
         ]
+
+
+class TestIsGitClone(object):
+
+    def setup_method(self, _):
+        self.cls = VersionFinder('foo', package_file='/foo/bar/baz.py')
+
+    def test_true(self):
+        with patch('%s.os.path.exists' % pbm) as mock_exists:
+            with patch('%s._package_top_dir' % pb) as mock_top_dir:
+                mock_top_dir.return_value = ['/foo/bar', '/foo/bar/baz']
+                mock_exists.side_effect = [False, True]
+                res = self.cls._is_git_clone
+        assert res is True
+        assert mock_exists.mock_calls == [
+            call('/foo/bar/.git'),
+            call('/foo/bar/baz/.git')
+        ]
+
+    def test_false(self):
+        with patch('%s.os.path.exists' % pbm) as mock_exists:
+            with patch('%s._package_top_dir' % pb) as mock_top_dir:
+                mock_top_dir.return_value = ['/foo/bar', '/foo/bar/baz']
+                mock_exists.return_value = False
+                res = self.cls._is_git_clone
+        assert res is False
+        assert mock_exists.mock_calls == [
+            call('/foo/bar/.git')
+        ]
+
+    def test_not_yet(self):
+        print("TODO: get rid of this naive package path finding, and"
+              "do something better that actually looks for the package"
+              "top directory")
+        assert 1 == 0
+
+class DONOTTest_VersionFinder(object):
+    """
+    Mocked unit tests for VersionFinder
+    """
 
     def test_find_git_info(self):
         cls = VersionFinder()
         # this is a horribly ugly way to get this to work on py26-py34
         mocks = {}
         with patch.multiple(
-            self.mpb,
+            pbm,
             _get_git_commit=DEFAULT,
             _get_git_tag=DEFAULT,
             _get_git_url=DEFAULT,
         ) as mocks1:
             mocks.update(mocks1)
             with patch.multiple(
-                self.pb,
+                pb,
                 _is_git_dirty=DEFAULT,
             ) as mocks2:
                 mocks.update(mocks2)
                 with patch.multiple(
-                    '%s.os' % self.mpb,
+                    '%s.os' % pbm,
                     getcwd=DEFAULT,
                     chdir=DEFAULT,
                 ) as mocks3:
@@ -236,19 +736,19 @@ class Test_VersionFinder(object):
         # this is a horribly ugly way to get this to work on py26-py34
         mocks = {}
         with patch.multiple(
-            self.mpb,
+            pbm,
             _get_git_commit=DEFAULT,
             _get_git_tag=DEFAULT,
             _get_git_url=DEFAULT,
         ) as mocks1:
             mocks.update(mocks1)
             with patch.multiple(
-                self.pb,
+                pb,
                 _is_git_dirty=DEFAULT,
             ) as mocks2:
                 mocks.update(mocks2)
                 with patch.multiple(
-                    '%s.os' % self.mpb,
+                    '%s.os' % pbm,
                     getcwd=DEFAULT,
                     chdir=DEFAULT,
                 ) as mocks3:
@@ -397,11 +897,11 @@ class Test_VersionFinder(object):
             req='awslimitchecker==0.1.0'
         )
 
-        with patch('%s.pip.get_installed_distributions' % self.mpb
+        with patch('%s.pip.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % self.mpb
+            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
-                with patch('%s._dist_version_url' % self.pb) as mock_dist_vu:
+                with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
@@ -421,11 +921,11 @@ class Test_VersionFinder(object):
             req='awslimitchecker==0.1.0'
         )
 
-        with patch('%s.pip.get_installed_distributions' % self.mpb
+        with patch('%s.pip.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % self.mpb
+            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
-                with patch('%s._dist_version_url' % self.pb) as mock_dist_vu:
+                with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
@@ -448,11 +948,11 @@ class Test_VersionFinder(object):
             req=req_str
         )
 
-        with patch('%s.pip.get_installed_distributions' % self.mpb
+        with patch('%s.pip.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % self.mpb
+            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
-                with patch('%s._dist_version_url' % self.pb) as mock_dist_vu:
+                with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
@@ -475,11 +975,11 @@ class Test_VersionFinder(object):
             req=req_str
         )
 
-        with patch('%s.pip.get_installed_distributions' % self.mpb
+        with patch('%s.pip.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % self.mpb
+            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
-                with patch('%s._dist_version_url' % self.pb) as mock_dist_vu:
+                with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
@@ -492,472 +992,15 @@ class Test_VersionFinder(object):
     def test_find_pkg_info(self):
         cls = VersionFinder()
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
-        with patch('%s.pkg_resources.require' % self.mpb) as mock_require:
-            with patch('%s._dist_version_url' % self.pb) as mock_dvu:
+        with patch('%s.pkg_resources.require' % pbm) as mock_require:
+            with patch('%s._dist_version_url' % pb) as mock_dvu:
                 mock_require.return_value = [mock_distA]
                 mock_dvu.return_value = ('7.8.9', 'http://foobar')
                 res = cls._find_pkg_info()
         assert res == {'version': '7.8.9', 'url': 'http://foobar'}
 
-    def test_find_package_version_git_notag(self):
-        cls = VersionFinder()
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': 'git+https://foo',
-                'tag': None,
-                'commit': '12345678',
-                'dirty': False
-            }
-            mocks['_find_pip_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pip'
-            }
-            mocks['_find_pkg_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pkg_resources'
-            }
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'git+https://foo',
-            'tag': None,
-            'commit': '12345678',
-            'dirty': False,
-        }
-        assert mocks['_find_git_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
 
-    def test_find_package_version_git_notag_dirty(self):
-        cls = VersionFinder()
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': 'git+https://foo',
-                'tag': None,
-                'commit': '12345678',
-                'dirty': True
-            }
-            mocks['_find_pip_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pip'
-            }
-            mocks['_find_pkg_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pkg_resources'
-            }
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'git+https://foo',
-            'tag': None,
-            'commit': '12345678*',
-            'dirty': True,
-        }
-        assert mocks['_find_git_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_git_tag(self):
-        cls = VersionFinder()
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': 'git+https://foo',
-                'tag': 'mytag',
-                'commit': '12345678',
-                'dirty': False
-            }
-            mocks['_find_pip_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pip'
-            }
-            mocks['_find_pkg_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pkg_resources'
-            }
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'git+https://foo',
-            'tag': 'mytag',
-            'commit': '12345678',
-            'dirty': False,
-        }
-        assert mocks['_find_git_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_git_tag_dirty(self):
-        cls = VersionFinder()
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': 'git+https://foo',
-                'tag': 'mytag',
-                'commit': '12345678',
-                'dirty': True
-            }
-            mocks['_find_pip_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pip'
-            }
-            mocks['_find_pkg_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pkg_resources'
-            }
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'git+https://foo',
-            'tag': 'mytag*',
-            'commit': '12345678*',
-            'dirty': True,
-        }
-        assert mocks['_find_git_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_pkg_res_exception(self):
-        cls = VersionFinder()
-
-        def se_exception():
-            raise Exception("some exception")
-
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': 'git+https://foo',
-                'tag': None,
-                'commit': '12345678',
-                'dirty': False
-            }
-            mocks['_find_pip_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pip'
-            }
-            mocks['_find_pkg_info'].side_effect = se_exception
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'git+https://foo',
-            'tag': None,
-            'commit': '12345678',
-            'dirty': False,
-        }
-        assert mocks['_find_git_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_pip_exception(self):
-        cls = VersionFinder()
-
-        def se_exception():
-            raise Exception("some exception")
-
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': 'git+https://foo',
-                'tag': None,
-                'commit': '12345678',
-                'dirty': False
-            }
-            mocks['_find_pip_info'].side_effect = se_exception
-            mocks['_find_pkg_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pkg_resources'
-            }
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'git+https://foo',
-            'tag': None,
-            'commit': '12345678',
-            'dirty': False,
-        }
-        assert mocks['_find_git_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_no_git(self):
-        cls = VersionFinder()
-
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': None,
-                'tag': None,
-                'commit': None,
-                'dirty': None,
-            }
-            mocks['_find_pip_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pip'
-            }
-            mocks['_find_pkg_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pkg_resources'
-            }
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = False
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'http://my.package.url/pip',
-            'tag': None,
-            'commit': None,
-        }
-        assert mocks['_find_git_info'].mock_calls == []
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_no_git_no_pip(self):
-        cls = VersionFinder()
-
-        def se_exception():
-            raise Exception("some exception")
-
-        with patch.multiple(
-            self.pb,
-            autospec=True,
-            _find_git_info=DEFAULT,
-            _find_pip_info=DEFAULT,
-            _find_pkg_info=DEFAULT,
-        ) as mocks:
-            mocks['_find_git_info'].return_value = {
-                'url': None,
-                'tag': None,
-                'commit': None,
-                'dirty': None,
-            }
-            mocks['_find_pip_info'].side_effect = se_exception
-            mocks['_find_pkg_info'].return_value = {
-                'version': '1.2.3',
-                'url': 'http://my.package.url/pkg_resources'
-            }
-            with patch('%s._is_git_clone' % self.pb,
-                       new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = False
-                res = cls.find_package_version()
-        assert res == {
-            'version': '1.2.3',
-            'url': 'http://my.package.url/pkg_resources',
-            'tag': None,
-            'commit': None,
-        }
-        assert mocks['_find_git_info'].mock_calls == []
-        assert mocks['_find_pip_info'].mock_calls == [call(cls)]
-        assert mocks['_find_pkg_info'].mock_calls == [call(cls)]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_debug(self):
-        mock_pip_logger = Mock(spec_set=logging.Logger)
-
-        with patch.dict('%s.os.environ' % self.mpb,
-                        {'VERSIONCHECK_DEBUG': 'true'}):
-            with patch('%s.logging' % self.mpb) as mock_logging:
-                cls = VersionFinder()
-                with patch.multiple(
-                        self.pb,
-                        autospec=True,
-                        _find_git_info=DEFAULT,
-                        _find_pip_info=DEFAULT,
-                        _find_pkg_info=DEFAULT,
-                ) as mocks:
-                    mocks['_find_git_info'].return_value = {
-                        'url': None,
-                        'tag': None,
-                        'commit': None,
-                        'dirty': None,
-                    }
-                    mocks['_find_pip_info'].return_value = {
-                        'version': '1.2.3',
-                        'url': 'http://my.package.url/pip'
-                    }
-                    mocks['_find_pkg_info'].return_value = {
-                        'version': '1.2.3',
-                        'url': 'http://my.package.url/pkg_resources'
-                    }
-                    with patch('%s.logger' % self.mpb,
-                               spec_set=logging.Logger) as mock_mod_logger:
-                        mock_logging.getLogger.return_value = mock_pip_logger
-                        with patch('%s._is_git_clone' % self.pb,
-                                   new_callable=PropertyMock) as mock_is_git:
-                            mock_is_git.return_value = False
-                            cls.find_package_version()
-        assert mock_logging.mock_calls == []
-        assert mock_pip_logger.mock_calls == []
-        assert mock_mod_logger.mock_calls == [
-            call.debug('Install does not appear to be a git clone'),
-            call.debug('pip info: %s', {'url': 'http://my.package.url/pip',
-                                        'version': '1.2.3'}),
-            call.debug('pkg_resources info: %s',
-                       {'url': 'http://my.package.url/pkg_resources',
-                        'version': '1.2.3'}),
-            call.debug('Final package info: %s',
-                       {'url': 'http://my.package.url/pip', 'commit': None,
-                        'version': '1.2.3', 'tag': None})
-        ]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_find_package_version_no_debug(self):
-        mock_pip_logger = Mock()
-        type(mock_pip_logger).propagate = False
-
-        with patch.dict('%s.os.environ' % self.mpb,
-                        {'VERSIONCHECK_DEBUG': 'false'}):
-            with patch('%s.logging' % self.mpb) as mock_logging:
-                mock_logging.getLogger.return_value = mock_pip_logger
-                cls = VersionFinder()
-                with patch.multiple(
-                        self.pb,
-                        autospec=True,
-                        _find_git_info=DEFAULT,
-                        _find_pip_info=DEFAULT,
-                        _find_pkg_info=DEFAULT,
-                ) as mocks:
-                    mocks['_find_git_info'].return_value = {
-                        'url': None,
-                        'tag': None,
-                        'commit': None,
-                        'dirty': None,
-                    }
-                    mocks['_find_pip_info'].return_value = {
-                        'version': '1.2.3',
-                        'url': 'http://my.package.url/pip'
-                    }
-                    mocks['_find_pkg_info'].return_value = {
-                        'version': '1.2.3',
-                        'url': 'http://my.package.url/pkg_resources'
-                    }
-                    with patch('%s.logger' % self.mpb,
-                               spec_set=logging.Logger) as mock_mod_logger:
-                        with patch('%s._is_git_clone' % self.pb,
-                                   new_callable=PropertyMock) as mock_is_git:
-                            mock_is_git.return_value = False
-                            cls.find_package_version()
-        assert mock_logging.mock_calls == [
-            call.getLogger("pip"),
-            call.getLogger().setLevel(mock_logging.WARNING)
-        ]
-        assert mock_pip_logger.mock_calls == [
-            call.setLevel(mock_logging.WARNING),
-        ]
-        assert mock_mod_logger.mock_calls == [
-            call.setLevel(mock_logging.WARNING),
-            call.debug('Install does not appear to be a git clone'),
-            call.debug('pip info: %s', {'url': 'http://my.package.url/pip',
-                                        'version': '1.2.3'}),
-            call.debug('pkg_resources info: %s',
-                       {'url': 'http://my.package.url/pkg_resources',
-                        'version': '1.2.3'}),
-            call.debug('Final package info: %s',
-                       {'url': 'http://my.package.url/pip', 'commit': None,
-                        'version': '1.2.3', 'tag': None})
-        ]
-        assert mock_is_git.mock_calls == [call()]
-
-    def test_is_git_clone_true(self):
-        foo_path = '/foo/bar/awslimitchecker/awslimitchecker/versioncheck.pyc'
-
-        with patch.multiple(
-                '%s.os.path' % self.mpb,
-                abspath=DEFAULT,
-                exists=DEFAULT,
-        ) as mocks:
-            mocks['abspath'].return_value = foo_path
-            mocks['exists'].return_value = True
-            cls = VersionFinder()
-            res = cls._is_git_clone
-        assert res is True
-        assert mocks['abspath'].call_count == 1
-        assert mocks['exists'].mock_calls == [
-            call('/foo/bar/awslimitchecker/.git')
-        ]
-
-    def test_is_git_clone_false(self):
-        foo_path = '/foo/bar/awslimitchecker/awslimitchecker/versioncheck.pyc'
-
-        with patch.multiple(
-                '%s.os.path' % self.mpb,
-                abspath=DEFAULT,
-                exists=DEFAULT,
-        ) as mocks:
-            mocks['abspath'].return_value = foo_path
-            mocks['exists'].return_value = False
-            cls = VersionFinder()
-            res = cls._is_git_clone
-        assert res is False
-        assert mocks['abspath'].call_count == 1
-        assert mocks['exists'].mock_calls == [
-            call('/foo/bar/awslimitchecker/.git')
-        ]
-
-
-class Test_VersionCheck_Funcs(object):
+class DONOTTest_VersionCheck_Funcs(object):
     """
     Mocked unit tests for versioncheck functions
     """
@@ -968,7 +1011,7 @@ class Test_VersionCheck_Funcs(object):
         cmd_out = '' \
                 "origin  git@github.com:jantman/awslimitchecker.git (fetch)\n" \
                 "origin  git@github.com:jantman/awslimitchecker.git (push)\n"
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = cmd_out
             res = _get_git_url()
         assert res == 'git@github.com:jantman/awslimitchecker.git'
@@ -985,7 +1028,7 @@ class Test_VersionCheck_Funcs(object):
                   "r.git (fetch)\n" \
                   "upstream        https://github.com/jantman/awslimitchecker" \
                   ".git (push)\n"
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = cmd_out
             res = _get_git_url()
         assert res == 'git@github.com:someone/awslimitchecker.git'
@@ -1006,7 +1049,7 @@ class Test_VersionCheck_Funcs(object):
                   "r.git (fetch)\n" \
                   "another        https://github.com/foo/awslimitchecker" \
                   ".git (push)\n"
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = cmd_out
             res = _get_git_url()
         assert res == 'https://github.com/foo/awslimitchecker.git'
@@ -1019,7 +1062,7 @@ class Test_VersionCheck_Funcs(object):
         def se(foo, stderr=None):
             raise subprocess.CalledProcessError(3, 'mycommand')
 
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.side_effect = se
             res = _get_git_url()
         assert res is None
@@ -1029,7 +1072,7 @@ class Test_VersionCheck_Funcs(object):
 
     def test_get_git_url_none(self):
         cmd_out = ''
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = cmd_out
             res = _get_git_url()
         assert res is None
@@ -1044,7 +1087,7 @@ class Test_VersionCheck_Funcs(object):
                   ".git (push)\n" \
                   "another        https://github.com/jantman/awslimitchecker" \
                   ".git (push)\n"
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = cmd_out
             res = _get_git_url()
         assert res is None
@@ -1053,7 +1096,7 @@ class Test_VersionCheck_Funcs(object):
         ]
 
     def test_get_git_tag(self):
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = 'mytag'
             res = _get_git_tag('abcd')
         assert res == 'mytag'
@@ -1063,14 +1106,14 @@ class Test_VersionCheck_Funcs(object):
         ]
 
     def test_get_git_tag_commit_none(self):
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = 'mytag'
             res = _get_git_tag(None)
         assert res is None
         assert mock_check_out.mock_calls == []
 
     def test_get_git_tag_no_tags(self):
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = ''
             res = _get_git_tag('abcd')
         assert res is None
@@ -1084,7 +1127,7 @@ class Test_VersionCheck_Funcs(object):
         def se(foo, stderr=None):
             raise subprocess.CalledProcessError(3, 'mycommand')
 
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.side_effect = se
             res = _get_git_tag('abcd')
         assert res is None
@@ -1094,7 +1137,7 @@ class Test_VersionCheck_Funcs(object):
         ]
 
     def test_get_git_commit(self):
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.return_value = '1234abcd'
             res = _get_git_commit()
         assert res == '1234abcd'
@@ -1108,7 +1151,7 @@ class Test_VersionCheck_Funcs(object):
         def se(foo):
             raise subprocess.CalledProcessError(3, 'mycommand')
 
-        with patch('%s._check_output' % self.pb) as mock_check_out:
+        with patch('%s._check_output' % pb) as mock_check_out:
             mock_check_out.side_effect = se
             res = _get_git_commit()
         assert res is None
@@ -1130,7 +1173,7 @@ class Test_VersionCheck_Funcs(object):
     def test_check_output_py26(self):
         mock_p = Mock(returncode=0)
         mock_p.communicate.return_value = ('foo', 'bar')
-        with patch('%s.subprocess.Popen' % self.pb) as mock_popen:
+        with patch('%s.subprocess.Popen' % pb) as mock_popen:
             mock_popen.return_value = mock_p
             res = _check_output(['mycmd'], stderr='something')
         assert res == 'foo'
@@ -1156,7 +1199,7 @@ class Test_VersionCheck_Funcs(object):
     def test_check_output_py26_exception(self):
         mock_p = Mock(returncode=2)
         mock_p.communicate.return_value = ('foo', 'bar')
-        with patch('%s.subprocess.Popen' % self.pb) as mock_popen:
+        with patch('%s.subprocess.Popen' % pb) as mock_popen:
             mock_popen.return_value = mock_p
             with pytest.raises(subprocess.CalledProcessError) as exc:
                 _check_output(['mycmd'], stderr='something')
@@ -1182,7 +1225,7 @@ class Test_VersionCheck_Funcs(object):
                 sys.version_info[2]
         ))
     def test_check_output_py27(self):
-        with patch('%s.subprocess.check_output' % self.pb) as mock_check_out:
+        with patch('%s.subprocess.check_output' % pb) as mock_check_out:
             mock_check_out.return_value = 'foobar'
             res = _check_output(['foo', 'bar'], stderr='something')
         assert res == 'foobar'
@@ -1197,7 +1240,7 @@ class Test_VersionCheck_Funcs(object):
                             sys.version_info[2]
                         ))
     def test_check_output_py3(self):
-        with patch('%s.subprocess.check_output' % self.pb) as mock_check_out:
+        with patch('%s.subprocess.check_output' % pb) as mock_check_out:
             mock_check_out.return_value = 'foobar'.encode('utf-8')
             res = _check_output(['foo', 'bar'], stderr='something')
         assert res == 'foobar'

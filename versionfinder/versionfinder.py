@@ -43,6 +43,8 @@ import logging
 import re
 import sys
 import locale
+import inspect
+from contextlib import contextmanager
 
 if sys.version_info >= (3, 3):
     from subprocess import DEVNULL
@@ -66,15 +68,27 @@ logger = logging.getLogger(__name__)
 
 class VersionFinder(object):
 
-    def __init__(self, package_name):
+    def __init__(self, package_name, package_file=None):
         """
         Initialize a VersionFinder to find version information of the named
-        package.
+        package, which includes a given file. ``package_file`` must be a Python
+        file in the package; if not specified, the file calling this class
+        will be used.
 
         :param package_name: name of the package to find information about
         :type package_name: str
+        :param package_file: absolute path to a Python source file in the
+          package to find information about; if not specified, the file calling
+          this class will be used
+        :type package_file: str
         """
         self.package_name = package_name
+        if package_file is not None:
+            self.package_file = package_file
+        else:
+            frame = inspect.stack()[1]
+            self.package_file = os.path.abspath(frame.filename)
+        self.package_dir = os.path.dirname(self.package_file)
 
     def find_package_version(self):
         """
@@ -156,14 +170,10 @@ class VersionFinder(object):
         :rtype: bool
         :returns: True if installed via git, False otherwise
         """
-        distpath = os.path.normpath(
-            os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                '../'
-            )
-        )
-        gitpath = os.path.join(distpath, '.git')
-        return os.path.exists(gitpath)
+        for p in self._package_top_dir:
+            if os.path.exists(os.path.join(p, '.git')):
+                return True
+        return False
 
     def _find_pkg_info(self):
         """
@@ -253,11 +263,12 @@ class VersionFinder(object):
         :returns: True if clone is dirty, False otherwise
         :rtype: bool
         """
-        status = _check_output([
-            'git',
-            'status',
-            '-u'
-        ], stderr=DEVNULL).strip()
+        with chdir(self.package_dir):
+            status = _check_output([
+                'git',
+                'status',
+                '-u'
+            ], stderr=DEVNULL).strip()
         if (('Your branch is up-to-date with' not in status and
                 'HEAD detached at' not in status and
                 'Not currently on any branch' not in status) or
@@ -266,6 +277,16 @@ class VersionFinder(object):
             return True
         return False
 
+    @property
+    def _package_top_dir(self):
+        """
+        Find one or more directories that we think may be the top-level
+        directory of the package; return a list of their absolute paths.
+
+        :return: list of possible package top-level directories (absolute paths)
+        :rtype: list
+        """
+        return [self.package_dir]
 
 def _check_output(args, stderr=None):
     """
@@ -365,3 +386,13 @@ def _get_git_url():
     except IndexError:
         url = None
     return url
+
+
+@contextmanager
+def chdir(path):
+    old_dir = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(old_dir)
