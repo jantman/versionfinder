@@ -37,6 +37,28 @@ git push origin $newver
 python setup.py sdist
 python setup.py bdist_wheel
 
+# 2.7 egg
+python setup.py bdist_egg
+deactivate
+
+# other eggs
+#for py in python2.6 python3.3 python3.4 python3.5; do
+for py in python2.6; do
+    if [[ "$py" == "python3.2" ]]; then
+        # we need virtualenv==13.1.2 on py32
+        bin/pip install virtualenv==13.1.2
+        bin/virtualenv --python=$py venv_$py
+    else
+        virtualenv --python=$py venv_$py
+    fi
+    source venv_${py}/bin/activate
+    pip install $vfdir
+    python setup.py bdist_egg
+    deactivate
+done
+
+source bin/activate
+
 # new commit
 echo "test_package_update.sh at $(date)" >> README.rst
 git add README.rst
