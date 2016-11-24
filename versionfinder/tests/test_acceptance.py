@@ -1,6 +1,11 @@
 """
 versionfinder/tests/test_acceptance.py
 
+SEE TestAcceptance class docstring for information!
+
+!!!!!!!IMPORTANT!!!!!!
+When adding test cases, also add them to the list in README.rst!
+
 The latest version of this package is available at:
 <https://github.com/jantman/versionfinder>
 
@@ -48,12 +53,12 @@ import pytest
 import sys
 import os
 import subprocess
-import shutil
 import json
 import requests
+import inspect
 from tempfile import mkdtemp
+from contextlib import contextmanager
 
-from versionfinder.version import VERSION
 from versionfinder.versionfinder import (
     _get_git_commit, _get_git_url, _get_git_tag, _check_output, chdir
 )
@@ -76,16 +81,714 @@ TEST_WHEEL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
              'download/0.2.1/versionfinder_test_pkg-0.2.1-py2.py3-none-any.whl'
 
 
-def print_header(s):
-    print("%s %s %s" % ("#" * 20, s, "#" * 20))
+@contextmanager
+def capsys_disabled(capsys):
+    """
+    Backport of pytest's ``capsys.disabled`` ContextManager to pytest versions
+    < 3.0. Allows us to print/write directly to stdout and stderr from within
+    tests.
+
+    :param capsys: pytest capsys fixture
+    """
+    capmanager = capsys.request.config.pluginmanager.getplugin('capturemanager')
+    capmanager.suspendcapture_item(capsys.request.node, "call", in_=True)
+    try:
+        yield
+    finally:
+        capmanager.resumecapture()
+
+
+@pytest.mark.acceptance
+class DONOTTestTest(object):
+
+    def test_passing(self, capsys, tmpdir):
+        print("foo print")
+        sys.stdout.write("foo stdout\n")
+        sys.stderr.write("bar stderr\n")
+        with capsys_disabled(capsys):
+            print("\n%s() printcapsys" % inspect.stack()[0][0].f_code.co_name)
+        print("bar print")
+        sys.stdout.write("bar stdout\n")
+        sys.stderr.write("bar stderr\n")
+        self._make_venv(str(tmpdir))
+        print("baz print")
+        sys.stdout.write("baz stdout\n")
+        sys.stderr.write("baz stderr\n")
+        assert 1 == 1
+
+    def test_failing(self, capsys, tmpdir):
+        print("foo print")
+        sys.stdout.write("foo stdout\n")
+        sys.stderr.write("bar stderr\n")
+        with capsys_disabled(capsys):
+            print("\n%s() printcapsys" % inspect.stack()[0][0].f_code.co_name)
+        print("bar print")
+        sys.stdout.write("bar stdout\n")
+        sys.stderr.write("bar stderr\n")
+        self._make_venv(str(tmpdir))
+        print("baz print")
+        sys.stdout.write("baz stdout\n")
+        sys.stderr.write("baz stderr\n")
+        assert 1 == 0
+
+    def _make_venv(self, path):
+        """
+        Create a venv in ``path``. Make sure it exists.
+
+        :param path: filesystem path to directory to make the venv base
+        """
+        virtualenv = os.path.join(str(sys.prefix), 'bin', 'virtualenv')
+        assert os.path.exists(virtualenv) is True, 'virtualenv not found'
+        args = [str(virtualenv), str(path)]
+        print_header(" _make_venv() running: " + ' '.join(args))
+        try:
+            res = _check_output(args, stderr=subprocess.STDOUT)
+            print(res)
+            print_header("DONE")
+        except subprocess.CalledProcessError:
+            print_header('FAILED')
+        pypath = os.path.join(path, 'bin', 'python')
+        assert os.path.exists(pypath) is True, "does not exist: %s" % pypath
 
 
 @pytest.mark.acceptance
 class TestAcceptance(object):
     """
-    Long-running acceptance tests for VersionFinder, which create venvs,
-    install the code in them, and test the output
+    Long-running acceptance tests for VersionFinder.
+
+    The purpose of these tests is to create virtualenvs and then install an
+    example package (https://github.com/jantman/versionfinder-test-pkg) in them
+    using a variety of methods (i.e. setup.py, pip install from directory,
+    git URL, tarball or wheel, etc.), and then call the package's console entry
+    point (``versionfinder-test``) which calls ``versionfinder.find_version()``
+    from a number of different locations in the package tree, and finally writes
+    JSON to STDOUT describing the result of each of the ``find_version()`` calls
+    (and any exceptions they raised). We then compare them to each other and,
+    assuming they're all identical, compare them to our expected output.
+
+    The goal is to confirm that versionfinder returns the correct information
+    when the target package is installed with as many different methods as
+    possible.
     """
+
+    ################
+    # Actual Tests #
+    ################
+
+    def test_install_local_master(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._pip_install(path, [test_src])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_local_e(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._pip_install(path, ['-e', test_src])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_local_e_dirty(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._pip_install(path, ['-e', test_src])
+        fpath = os.path.join(test_src, 'versionfinder_test_pkg', 'foo.py')
+        print("Creating junk file at %s" % fpath)
+        with open(fpath, 'w') as fh:
+            fh.write("testing")
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': True,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_local_e_tag(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._pip_install(path, ['-e', test_src])
+        fpath = os.path.join(test_src, 'versionfinder_test_pkg', 'foo.py')
+        print("Creating junk file at %s" % fpath)
+        with open(fpath, 'w') as fh:
+            fh.write("testing")
+        commit = self._git_add_commit(test_src, 'versioncheck tag')
+        self._set_git_tag(test_src, 'versioncheck')
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': 'versioncheck',
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_local_e_checkout_tag(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._pip_install(path, ['-e', test_src])
+        self._git_checkout(test_src, TEST_TAG)
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_TAG_COMMIT,
+                'git_tag': TEST_TAG,
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_local_e_checkout_commit(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._pip_install(path, ['-e', test_src])
+        self._git_checkout(test_src, TEST_TAG_COMMIT)
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_TAG_COMMIT,
+                'git_tag': TEST_TAG,
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_local_e_multiple_remotes(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._git_add_remote(test_src, 'testremote',
+                             'https://github.com/jantman/awslimitchecker.git')
+        self._pip_install(path, ['-e', test_src])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': 'https://github.com/jantman/awslimitchecker.git',
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_sdist(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, self.test_tarball))
+        self._pip_install(path, [self.test_tarball])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_sdist_pip154(self, capsys, tmpdir):
+        """regression test for issue #55"""
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, self.test_tarball))
+        self._pip_install(path, ['--force-reinstall', 'pip==1.5.4'])
+        self._pip_install(path, [self.test_tarball])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_bdist_wheel(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, self.test_wheel))
+        self._pip_install(path, [self.test_wheel])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_commit(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_MASTER_COMMIT
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_tag(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_TAG
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': TEST_TAG,
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_branch(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_BRANCH
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_BRANCH_COMMIT,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            '-e',
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_multiple_remotes(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            '-e',
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
+        ])
+        p = os.path.join(path, 'src', 'versionfinder-test-pkg')
+        self._git_add_remote(p, 'testremote',
+                             'https://github.com/jantman/awslimitchecker.git')
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_dirty(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            '-e',
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
+        ])
+        fpath = os.path.join(
+            path, 'src', 'versionfinder-test-pkg', 'versionfinder_test_pkg',
+            'foo.py'
+        )
+        print("Creating junk file at %s" % fpath)
+        with open(fpath, 'w') as fh:
+            fh.write("testing")
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_is_dirty': True,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_commit(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            '-e',
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_MASTER_COMMIT
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_tag(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            '-e',
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_TAG
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_TAG_COMMIT,
+                'git_tag': TEST_TAG,
+                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_branch(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            '-e',
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_BRANCH
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_BRANCH_COMMIT,
+                'git_tag': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_is_dirty': False,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_sdist_in_git_repo(self, capsys, tmpdir):
+        """regression test for issue #73"""
+        path = str(tmpdir)
+        self._make_git_repo(path)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, self.test_tarball))
+        self._pip_install(path, [self.test_tarball])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_wheel_in_git_repo(self, capsys, tmpdir):
+        """regression test for issue #73"""
+        path = str(tmpdir)
+        self._make_git_repo(path)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, self.test_wheel))
+        self._pip_install(path, [self.test_wheel])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_setuppy_develop(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        with chdir(test_src):
+            cmd = [
+                os.path.join(path, 'bin', 'python'),
+                os.path.join(test_src, 'setup.py'),
+                'develop'
+            ]
+            print_header('running: %s' % ' '.join(cmd))
+            output = _check_output(cmd, stderr=subprocess.STDOUT)
+            print(output)
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_setuppy_install(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        with chdir(test_src):
+            cmd = [
+                os.path.join(path, 'bin', 'python'),
+                os.path.join(test_src, 'setup.py'),
+                'install'
+            ]
+            print_header('running: %s' % ' '.join(cmd))
+            output = _check_output(cmd, stderr=subprocess.STDOUT)
+            print(output)
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_origin': None,
+                'git_is_dirty': None,
+                'version': TEST_VERSION,
+                'url': TEST_PROJECT_URL,
+            }
+        }
+        assert sorted(actual) == sorted(expected)
+
+    ##################
+    # HELPER METHODS #
+    ##################
 
     def setup_method(self, method):
         os.environ['VERSIONCHECK_DEBUG'] = 'true'
@@ -118,6 +821,28 @@ class TestAcceptance(object):
         assert os.path.exists(s)
         return s
 
+    def _git_add_remote(self, path, rmt_name, rmt_url):
+        """
+        Add a git remote to the repo at path
+
+        :param path: path to the git repo
+        :type path: str
+        :param rmt_name: name for the remote
+        :type rmt_name: str
+        :param rmt_url: URL for the remote
+        :type rmt_url: str
+        """
+        args = [
+            'git',
+            'remote',
+            'add',
+            rmt_name,
+            rmt_url
+        ]
+        with chdir(path):
+            res = _check_output(args)
+            print(res)
+
     def _set_git_config(self, set_in_travis=False):
         if not set_in_travis and os.environ.get('TRAVIS', '') != 'true':
             print("not running in Travis; not setting git config")
@@ -133,13 +858,13 @@ class TestAcceptance(object):
         if res != '' and res is not None:
             print("Got git config user.email as %s" % res)
         else:
-            subprocess.call([
+            res = _check_output([
                 'git',
                 'config',
                 'user.email',
                 'travisci@jasonantman.com'
             ])
-            print("Set git config user.email")
+            print("Set git config user.email:\n%s" % res)
         # name
         try:
             res = _check_output([
@@ -153,13 +878,13 @@ class TestAcceptance(object):
         if res != '' and res is not None:
             print("Got git config user.name as %s" % res)
         else:
-            subprocess.call([
+            res = _check_output([
                 'git',
                 'config',
                 'user.name',
                 'travisci'
             ])
-            print("Set git config user.name")
+            print("Set git config user.name:\n%s" % res)
 
     def _set_git_tag(self, path, tagname):
         """set a git tag for the current commit"""
@@ -167,7 +892,7 @@ class TestAcceptance(object):
             tag = _get_git_tag(self.git_commit)
             if tag != tagname:
                 print("Creating git tag 'versiontest' of %s" % self.git_commit)
-                subprocess.call([
+                res = _check_output([
                     'git',
                     'tag',
                     '-a',
@@ -175,6 +900,7 @@ class TestAcceptance(object):
                     tagname,
                     tagname
                 ])
+                print(res)
                 tag = _get_git_tag(self.git_commit)
             print("Source git tag: %s" % tag)
         return tag
@@ -215,10 +941,11 @@ class TestAcceptance(object):
         assert os.path.exists(virtualenv) is True, 'virtualenv not found'
         args = [virtualenv, path]
         print_header(" _make_venv() running: " + ' '.join(args))
-        res = subprocess.call(args)
-        if res == 0:
+        try:
+            res = _check_output(args, stderr=subprocess.STDOUT)
+            print(res)
             print_header("DONE")
-        else:
+        except subprocess.CalledProcessError:
             print_header('FAILED')
         pypath = os.path.join(path, 'bin', 'python')
         assert os.path.exists(pypath) is True, "does not exist: %s" % pypath
@@ -234,29 +961,24 @@ class TestAcceptance(object):
         """
         pip = os.path.join(path, 'bin', 'pip')
         # get pip version
-        res = subprocess.call([pip, '--version'])
-        assert res == 0
+        res = _check_output([pip, '--version']).strip()
         # install ALC in it
         final_args = [pip, 'install']
         final_args.extend(args)
         print_header("_pip_install() running: " + ' '.join(final_args))
-        res = subprocess.call(final_args)
+        _check_output(final_args)
         print_header('DONE')
-        assert res == 0
 
     def _make_git_repo(self, path):
         """create a git repo under path; return the commit"""
         print_header("creating git repository in %s" % path)
         with chdir(path):
-            res = subprocess.call(['git', 'init', '.'])
-            assert res == 0
+            _check_output(['git', 'init', '.'])
             with open('foo', 'w') as fh:
                 fh.write('foo')
-            res = subprocess.call(['git', 'add', 'foo'])
-            assert res == 0
+            _check_output(['git', 'add', 'foo'])
             self._set_git_config(set_in_travis=True)
-            res = subprocess.call(['git', 'commit', '-m', 'foo'])
-            assert res == 0
+            _check_output(['git', 'commit', '-m', 'foo'])
             commit = _get_git_commit()
             print_header("git repository in %s commit: %s" % (path, commit))
         return commit
@@ -264,7 +986,7 @@ class TestAcceptance(object):
     def _get_version(self, path):
         """
         In the virtualenv at ``path``, run ``versionfinder-test`` and
-        return the JSON-decoded output.
+        return the JSON-decoded output dict.
 
         :param path: venv base/root path
         :type path: str
@@ -278,6 +1000,37 @@ class TestAcceptance(object):
         print('DONE')
         j = json.loads(res.strip())
         return strip_unicode(j)
+
+    def _get_result(self, d):
+        """
+        Given the raw (JSON-decoded) result dict from :py:meth:`~._get_version`,
+        iterate through all of the keys. Assert that their values are all
+        identical, and don't contain exceptions. Return the identical result
+        dict.
+
+        :param d: result dict from :py:meth:`~._get_version`
+        :type d: dict
+        :return: dict describing identical results
+        :rtype: dict
+        """
+        keys = sorted(d.keys())
+        # use the first one as "expected" to compare the others against
+        expected = d[keys[0]]
+        err = ''
+        # iterate each result; it's an error if either it failed, or it doesn't
+        # match the expected value
+        for k in keys:
+            if d[k].get('failed', True) is True:
+                err += "Key %s failed with %s %s: \n%s\n" % (
+                    k, d[k].get('exc_type', ''), d[k].get('exc_str', ''),
+                    d[k].get('traceback', ''))
+            if d[k] != expected:
+                err += "Key %s does not match expected:\n%s\n" % (
+                    k, dictdiff(d[k], expected))
+        # AssertionError on any error conditions, but we want to show ALL
+        assert err == '', err
+        # else return the indentical dict for all of them
+        return expected
 
     def _git_checkout(self, path, ref):
         cmd = ['git', 'checkout', '-f', ref]
@@ -328,354 +1081,30 @@ class TestAcceptance(object):
                 fh.write(chunk)
         return p
 
-    def _expected_dict(self, tag, commit, origin=None, dirty=None):
-        """
-        Build a dict of the expected return values for a given install method.
 
-        :return: expected dict
-        :rtype: dict
-        """
-        d = {}
-        for k in ["entrypoint", "entrypoint_other_file", "nested_check_file",
-                  "nested_class_check", "nested_class_check_file",
-                  "nested_file_check", "top_level_class_check",
-                  "top_level_class_check_file", "top_level_file_check",
-                  "top_level_file_check_file"]:
-            d[k] = {
-                'failed': False,
-                'result': {
-                    'git_commit': commit,
-                    'git_tag': tag,
-                    'git_origin': origin,
-                    'git_is_dirty': dirty,
-                    'version': TEST_VERSION,
-                    'url': TEST_PROJECT_URL,
-                }
-            }
-        return d
+def dictdiff(actual, expected, prefix=None):
+    s = ''
+    keys = set(actual.keys() + expected.keys())
+    for k in sorted(keys):
+        a = actual.get(k, '<missing>')
+        e = expected.get(k, '<missing>')
+        if prefix is None:
+            k_str = k
+        else:
+            k_str = prefix + '->' + k
+        if isinstance(a, type({})) and isinstance(e, type({})):
+            s += dictdiff(a, e, prefix=k)
+        else:
+            if a != e:
+                s += "*%s: actual='%s' expected='%s'\n" % (k_str, a, e)
+            else:
+                s += "%s: actual='%s' expected='%s'\n" % (k_str, a, e)
+    return s
 
-    ################
-    # Actual Tests #
-    ################
 
-    def test_install_local_master(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        self._pip_install(path, [test_src])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert actual == expected
+def print_header(s):
+    print("%s %s %s" % ("#" * 20, s, "#" * 20))
 
-    def test_install_local_e(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        self._pip_install(path, ['-e', test_src])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT)
-        assert actual == expected
-
-    def test_install_local_e_dirty(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        self._pip_install(path, ['-e', test_src])
-        fpath = os.path.join(test_src, 'versionfinder_test_pkg', 'foo.py')
-        print("Creating junk file at %s" % fpath)
-        with open(fpath, 'w') as fh:
-            fh.write("testing")
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT, dirty=True)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_local_e_tag(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        self._pip_install(path, ['-e', test_src])
-        fpath = os.path.join(test_src, 'versionfinder_test_pkg', 'foo.py')
-        print("Creating junk file at %s" % fpath)
-        with open(fpath, 'w') as fh:
-            fh.write("testing")
-        commit = self._git_add_commit(test_src, 'versioncheck tag')
-        self._set_git_tag(test_src, 'versioncheck')
-        actual = self._get_version(path)
-        expected = self._expected_dict('versioncheck', TEST_MASTER_COMMIT)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_local_e_checkout_tag(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        self._pip_install(path, ['-e', test_src])
-        self._git_checkout(test_src, TEST_TAG)
-        actual = self._get_version(path)
-        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_local_e_checkout_commit(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        self._pip_install(path, ['-e', test_src])
-        self._git_checkout(test_src, TEST_TAG_COMMIT)
-        actual = self._get_version(path)
-        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_local_e_multiple_remotes(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        with chdir(test_src):
-            subprocess.call([
-                'git',
-                'remote',
-                'add',
-                'testremote',
-                'https://github.com/jantman/awslimitchecker.git'
-            ])
-        self._pip_install(path, ['-e', test_src])
-        actual = self._get_version(path)
-        expected = self._expected_dict(
-            None, TEST_MASTER_COMMIT,
-            origin='https://github.com/jantman/awslimitchecker.git')
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_sdist(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [self.test_tarball])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_sdist_pip154(self, tmpdir):
-        """regression test for issue #55"""
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, ['--force-reinstall', 'pip==1.5.4'])
-        self._pip_install(path, [self.test_tarball])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_bdist_wheel(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [self.test_wheel])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            'git+%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_commit(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_MASTER_COMMIT
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_tag(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_TAG
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_branch(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_BRANCH
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_BRANCH_COMMIT)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_e(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            '-e',
-            'git+%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT,
-                                       origin=TEST_GIT_HTTPS_URL)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_e_multiple_remotes(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            '-e',
-            'git+%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL
-            )
-        ])
-        p = os.path.join(path, 'src', 'versionfinder-test-pkg')
-        with chdir(p):
-            subprocess.call([
-                'git',
-                'remote',
-                'add',
-                'testremote',
-                'https://github.com/jantman/awslimitchecker.git'
-            ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT,
-                                       origin=TEST_GIT_HTTPS_URL)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_e_dirty(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            '-e',
-            'git+%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL
-            )
-        ])
-        fpath = os.path.join(
-            path, 'src', 'versionfinder-test-pkg', 'versionfinder_test_pkg',
-            'foo.py'
-        )
-        print("Creating junk file at %s" % fpath)
-        with open(fpath, 'w') as fh:
-            fh.write("testing")
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT, dirty=True,
-                                       origin=TEST_GIT_HTTPS_URL)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_e_commit(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            '-e',
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_MASTER_COMMIT
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_MASTER_COMMIT,
-                                       origin=TEST_GIT_HTTPS_URL)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_e_tag(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            '-e',
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_TAG
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT,
-                                       origin=TEST_GIT_HTTPS_URL)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_git_e_branch(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._pip_install(path, [
-            '-e',
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_BRANCH
-            )
-        ])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, TEST_BRANCH_COMMIT,
-                                       origin=TEST_GIT_HTTPS_URL)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_sdist_in_git_repo(self, tmpdir):
-        """regression test for issue #73"""
-        path = str(tmpdir)
-        self._make_git_repo(path)
-        self._make_venv(path)
-        self._pip_install(path, [self.test_tarball])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_wheel_in_git_repo(self, tmpdir):
-        """regression test for issue #73"""
-        path = str(tmpdir)
-        self._make_git_repo(path)
-        self._make_venv(path)
-        self._pip_install(path, [self.test_wheel])
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_setuppy_develop(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        with chdir(test_src):
-            cmd = [
-                os.path.join(path, 'bin', 'python'),
-                os.path.join(test_src, 'setup.py'),
-                'develop'
-            ]
-            print_header('running: %s' % ' '.join(cmd))
-            output = _check_output(cmd, stderr=subprocess.STDOUT)
-            print(output)
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_setuppy_install(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        with chdir(test_src):
-            cmd = [
-                os.path.join(path, 'bin', 'python'),
-                os.path.join(test_src, 'setup.py'),
-                'install'
-            ]
-            print_header('running: %s' % ' '.join(cmd))
-            output = _check_output(cmd, stderr=subprocess.STDOUT)
-            print(output)
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
 
 def strip_unicode(d):
     n = {}
