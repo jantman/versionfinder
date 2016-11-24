@@ -69,12 +69,12 @@ logger = logging.getLogger(__name__)
 TEST_PROJECT = 'versionfinder_test_pkg'
 TEST_GIT_HTTPS_URL = 'https://github.com/jantman/versionfinder-test-pkg.git'
 TEST_PROJECT_URL = 'https://github.com/jantman/versionfinder-test-pkg'
-TEST_VERSION = '0.2.1'
-TEST_TAG = '0.2.1'
-TEST_TAG_COMMIT = 'e6a8778111043d0d0172281f3a33b0c00bd239b9'
-TEST_MASTER_COMMIT = '2665f9969af060a876db4dc3b030dabc15034c41'
+TEST_VERSION = '0.2.2'
+TEST_TAG = '0.2.2'
+TEST_TAG_COMMIT = 'cd4a19b4d6aed8bc9355711a3150fb316d5c9bb6'
+TEST_MASTER_COMMIT = '4cd3029d7e872f0a77fe2453e453850b86425bb3'
 TEST_BRANCH = 'testbranch'
-TEST_BRANCH_COMMIT = '1b289fdf7e187cb8a67c8e1dd9aafeb54c389c8f'
+TEST_BRANCH_COMMIT = '4a77d6fd9362a4ccd772277f16a4a74a5b201ca6'
 
 TEST_TARBALL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
                'download/{ver}/versionfinder_test_pkg-{ver}.tar' \
