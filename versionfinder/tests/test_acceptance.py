@@ -37,30 +37,55 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
+"""
+@TODO:
+
+Install methods should include:
+- install from a fork
+"""
+
 import pytest
 import sys
 import os
 import subprocess
 import shutil
+import json
+import requests
+from tempfile import mkdtemp
 
 from versionfinder.version import VERSION
 from versionfinder.versionfinder import (
-    _get_git_commit, _get_git_url, _get_git_tag, _check_output
+    _get_git_commit, _get_git_url, _get_git_tag, _check_output, chdir
 )
 
 import logging
 logger = logging.getLogger(__name__)
 
+TEST_PROJECT = 'versionfinder_test_pkg'
+TEST_GIT_HTTPS_URL = 'https://github.com/jantman/versionfinder-test-pkg.git'
+TEST_PROJECT_URL = 'https://github.com/jantman/versionfinder-test-pkg'
+TEST_VERSION = '0.2.1'
+TEST_TAG = '0.2.1'
+TEST_TAG_COMMIT = 'e6a8778111043d0d0172281f3a33b0c00bd239b9'
+TEST_MASTER_COMMIT = '2665f9969af060a876db4dc3b030dabc15034c41'
+TEST_BRANCH = 'testbranch'
+TEST_BRANCH_COMMIT = '1b289fdf7e187cb8a67c8e1dd9aafeb54c389c8f'
+TEST_TARBALL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
+               'download/0.2.1/versionfinder_test_pkg-0.2.1.tar.gz'
+TEST_WHEEL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
+             'download/0.2.1/versionfinder_test_pkg-0.2.1-py2.py3-none-any.whl'
+
+
+def print_header(s):
+    print("%s %s %s" % ("#" * 20, s, "#" * 20))
+
 
 @pytest.mark.acceptance
-class Test_AGPLVersionChecker_Acceptance(object):
+class TestAcceptance(object):
     """
-    Long-running acceptance tests for AGPLVersionChecker, which create venvs,
+    Long-running acceptance tests for VersionFinder, which create venvs,
     install the code in them, and test the output
     """
-
-    git_commit = None
-    git_tag = None
 
     def setup_method(self, method):
         os.environ['VERSIONCHECK_DEBUG'] = 'true'
@@ -69,30 +94,13 @@ class Test_AGPLVersionChecker_Acceptance(object):
         self.current_venv_path = sys.prefix
         self.source_dir = self._get_source_dir()
         self.git_commit = _get_git_commit()
-        self.git_tag = _get_git_tag(self.git_commit)
         self.git_url = _get_git_url()
-        print({
-            'self.source_dir': self.source_dir,
-            'self.git_commit': self.git_commit,
-            'self.git_tag': self.git_tag,
-            'self.git_url': self.git_url,
-        })
-        print(_check_output([
-                'git',
-                'show-ref',
-                '--tags'
-        ]).strip())
+        self.test_tarball = self._get_package(TEST_TARBALL)
+        self.test_wheel = self._get_package(TEST_WHEEL)
 
     def teardown_method(self, method):
         tag = _get_git_tag(self.git_commit)
         print("\n")
-        if tag is not None:
-            subprocess.call([
-                'git',
-                'tag',
-                '--delete',
-                tag
-            ])
         try:
             if 'testremote' in _check_output([
                 'git',
@@ -152,23 +160,49 @@ class Test_AGPLVersionChecker_Acceptance(object):
             ])
             print("Set git config user.name")
 
-    def _set_git_tag(self, tagname):
+    def _set_git_tag(self, path, tagname):
         """set a git tag for the current commit"""
-        tag = _get_git_tag(self.git_commit)
-        if tag != tagname:
-            print("Creating git tag 'versiontest' of %s" % self.git_commit)
-            subprocess.call([
-                'git',
-                'tag',
-                '-a',
-                '-m',
-                tagname,
-                tagname
-            ])
+        with chdir(path):
             tag = _get_git_tag(self.git_commit)
-        print("Source git tag: %s" % tag)
-        self.git_tag = tag
+            if tag != tagname:
+                print("Creating git tag 'versiontest' of %s" % self.git_commit)
+                subprocess.call([
+                    'git',
+                    'tag',
+                    '-a',
+                    '-m',
+                    tagname,
+                    tagname
+                ])
+                tag = _get_git_tag(self.git_commit)
+            print("Source git tag: %s" % tag)
         return tag
+
+    def _git_add_commit(self, path, commit_msg):
+        """
+        git add -A and git commit -m commit_msg in ``path``.
+        """
+        print_header('_git_add_commit(%s, %s)' % (path, commit_msg))
+        with chdir(path):
+            out = _check_output([
+                'git',
+                'add',
+                '-A'
+            ])
+            print(out)
+            out = _check_output([
+                'git',
+                'commit',
+                '-m',
+                '"%s"' % commit_msg
+            ])
+            print(out)
+            out = _check_output([
+                'git',
+                'rev-parse',
+                'HEAD'
+            ]).strip()
+        return out
 
     def _make_venv(self, path):
         """
@@ -179,14 +213,16 @@ class Test_AGPLVersionChecker_Acceptance(object):
         virtualenv = os.path.join(self.current_venv_path, 'bin', 'virtualenv')
         assert os.path.exists(virtualenv) is True, 'virtualenv not found'
         args = [virtualenv, path]
-        print("\n" + "#" * 20 + " running: " + ' '.join(args) + "#" * 20)
+        print_header(" _make_venv() running: " + ' '.join(args))
         res = subprocess.call(args)
         if res == 0:
-            print("\n" + "#" * 20 + " DONE: " + ' '.join(args) + "#" * 20)
+            print_header("DONE")
         else:
-            print("\n" + "#" * 20 + " FAILED: " + ' '.join(args) + "#" * 20)
+            print_header('FAILED')
         pypath = os.path.join(path, 'bin', 'python')
         assert os.path.exists(pypath) is True, "does not exist: %s" % pypath
+        # install our source in the venv
+        self._pip_install(path, [self.source_dir])
 
     def _get_source_dir(self):
         """
@@ -223,64 +259,68 @@ class Test_AGPLVersionChecker_Acceptance(object):
         # install ALC in it
         final_args = [pip, 'install']
         final_args.extend(args)
-        print("\n" + "#" * 20 + " running: " + ' '.join(final_args) + "#" * 20)
+        print_header("_pip_install() running: " + ' '.join(final_args))
         res = subprocess.call(final_args)
-        print("\n" + "#" * 20 + " DONE: " + ' '.join(final_args) + "#" * 20)
+        print_header('DONE')
         assert res == 0
 
     def _make_git_repo(self, path):
         """create a git repo under path; return the commit"""
-        print("creating git repository in %s" % path)
-        old_cwd = os.getcwd()
-        os.chdir(path)
-        res = subprocess.call(['git', 'init', '.'])
-        assert res == 0
-        with open('foo', 'w') as fh:
-            fh.write('foo')
-        res = subprocess.call(['git', 'add', 'foo'])
-        assert res == 0
-        self._set_git_config(set_in_travis=True)
-        res = subprocess.call(['git', 'commit', '-m', 'foo'])
-        assert res == 0
-        commit = _get_git_commit()
-        print("git repository in %s commit: %s" % (path, commit))
-        os.chdir(old_cwd)
+        print_header("creating git repository in %s" % path)
+        with chdir(path):
+            res = subprocess.call(['git', 'init', '.'])
+            assert res == 0
+            with open('foo', 'w') as fh:
+                fh.write('foo')
+            res = subprocess.call(['git', 'add', 'foo'])
+            assert res == 0
+            self._set_git_config(set_in_travis=True)
+            res = subprocess.call(['git', 'commit', '-m', 'foo'])
+            assert res == 0
+            commit = _get_git_commit()
+            print_header("git repository in %s commit: %s" % (path, commit))
         return commit
 
-    def _get_alc_version(self, path):
+    def _get_version(self, path):
         """
-        In the virtualenv at ``path``, run ``awslimitchecker --version`` and
-        return the string output.
+        In the virtualenv at ``path``, run ``versionfinder-test`` and
+        return the JSON-decoded output.
 
         :param path: venv base/root path
-        :return: version command output
-        :rtype: str
+        :type path: str
+        :return: versionfinder-test command output
+        :rtype: dict
         """
-        alc = os.path.join(path, 'bin', 'awslimitchecker')
-        args = [alc, '--version', '-vv']
-        print("\n" + "#" * 20 + " running: " + ' '.join(args) + "#" * 20)
-        res = _check_output(args, stderr=subprocess.STDOUT)
+        args = [os.path.join(path, 'bin', 'versionfinder-test')]
+        print_header("_get_version() running: " + ' '.join(args))
+        res = _check_output(args)
         print(res)
-        print("\n" + "#" * 20 + " DONE: " + ' '.join(args) + "#" * 20)
-        # confirm the git status
-        print(self._get_git_status(path))
-        # print(self._get_git_status(os.path.dirname(__file__)))
-        return res
+        print('DONE')
+        j = json.loads(res.strip())
+        return j
 
     def _get_git_status(self, path):
-        header = "#" * 20 + " running: git status in: %s " % path + "#" * 20
-        oldcwd = os.getcwd()
-        os.chdir(path)
-        try:
-            status = _check_output(['git', 'status'],
-                                   stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError:
-            status = ''
-        os.chdir(oldcwd)
+        header = "#" * 20 + " _get_git_status() running: git status in: " \
+                            "%s " % path + "#" * 20
+        with chdir(path):
+            try:
+                status = _check_output(['git', 'status'],
+                                       stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError:
+                status = ''
         footer = "#" * 20 + " DONE: git status " + "#" * 20
         if status == '':
             return "\n# git status exited non-0\n"
         return "\n" + header + "\n" + status + "\n" + footer + "\n"
+
+    def _git_checkout(self, path, ref):
+        cmd = ['git', 'checkout', '-f', ref]
+        print_header("_git_checkout() running: '%s' in: %s" % (
+            ' '.join(cmd), path))
+        with chdir(path):
+            output = _check_output(cmd, stderr=subprocess.STDOUT)
+            print(output)
+        print_header('DONE')
 
     def _make_package(self, pkg_type, test_tmp_dir):
         """
@@ -350,259 +390,388 @@ class Test_AGPLVersionChecker_Acceptance(object):
             return 2
         return 0
 
+    def _git_clone_test(self, ref=None):
+        """
+        Clone TEST_GIT_HTTPS_URL to a local temporary directory; checkout
+        the specified ref.
+
+        :return: path to git clone
+        :rtype: str
+        """
+        d = mkdtemp(prefix='pytest-versionfinder')
+        print_header('_git_clone_test(%s) cloning %s into %s' % (
+            ref, TEST_GIT_HTTPS_URL, d))
+        output = _check_output(
+            ['git', 'clone', TEST_GIT_HTTPS_URL, d],
+            stderr=subprocess.STDOUT
+        )
+        print(output)
+        print_header('DONE')
+        if ref is not None:
+            self._git_checkout(d, ref)
+        return d
+
+    def _get_package(self, pkg_url):
+        """
+        Download the package from ``pkg_url`` to a tempdir.
+
+        :param pkg_url: url of the package to download
+        :type pkg_url: str
+        :return: path to the package on disk
+        :rtype: str
+        """
+        fname = pkg_url.split('/')[-1]
+        d = mkdtemp(prefix='pytest-versionfinder')
+        p = os.path.join(d, fname)
+        r = requests.get(pkg_url, stream=True)
+        assert r.status_code == 200
+        with open(p, 'wb') as fh:
+            for chunk in r:
+                fh.write(chunk)
+        return p
+
+    def _expected_dict(self, tag, commit, origin=None, dirty=None):
+        """
+        Build a dict of the expected return values for a given install method.
+
+        :return: expected dict
+        :rtype: dict
+        """
+        d = {}
+        for k in ["entrypoint", "entrypoint_other_file", "nested_check_file",
+                  "nested_class_check", "nested_class_check_file",
+                  "nested_file_check", "top_level_class_check",
+                  "top_level_class_check_file", "top_level_file_check",
+                  "top_level_file_check_file"]:
+            d[k] = {
+                'failed': False,
+                'result': {
+                    'git_commit': commit,
+                    'git_tag': tag,
+                    'git_origin': origin,
+                    'git_is_dirty': dirty,
+                    'version': TEST_VERSION,
+                    'url': TEST_PROJECT_URL,
+                }
+            }
+        return d
+
     ################
     # Actual Tests #
     ################
 
-    def test_install_local(self, tmpdir):
+    def test_install_local_master(self, tmpdir):
         path = str(tmpdir)
-        # make the venv
         self._make_venv(path)
-        self._pip_install(path, [self.source_dir])
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v=VERSION,
-            u='https://github.com/jantman/awslimitchecker'
-        )
-        assert expected in version_output
+        test_src = self._git_clone_test()
+        self._pip_install(path, [test_src])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert actual == expected
 
     def test_install_local_e(self, tmpdir):
         path = str(tmpdir)
-        # make the venv
         self._make_venv(path)
-        self._pip_install(path, ['-e', self.source_dir])
-        version_output = self._get_alc_version(path)
-        expected_commit = self.git_commit
-        if self._check_git_pushed() != 0:
-            expected_commit += '*'
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v='%s@%s' % (VERSION, expected_commit),
-            u=self.git_url
-        )
-        assert expected in version_output
+        test_src = self._git_clone_test()
+        self._pip_install(path, ['-e', test_src])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT)
+        assert actual == expected
 
     def test_install_local_e_dirty(self, tmpdir):
         path = str(tmpdir)
-        # make the venv
         self._make_venv(path)
-        self._pip_install(path, ['-e', self.source_dir])
-        fpath = os.path.join(self.source_dir, 'awslimitchecker', 'testfile')
+        test_src = self._git_clone_test()
+        self._pip_install(path, ['-e', test_src])
+        fpath = os.path.join(test_src, 'versionfinder_test_pkg', 'foo.py')
         print("Creating junk file at %s" % fpath)
         with open(fpath, 'w') as fh:
             fh.write("testing")
-        version_output = self._get_alc_version(path)
-        print("Removing junk file at %s" % fpath)
-        os.unlink(fpath)
-        expected_commit = self.git_commit + '*'
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v='%s@%s' % (VERSION, expected_commit),
-            u=self.git_url
-        )
-        assert expected in version_output
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT, dirty=True)
+        assert sorted(actual) == sorted(expected)
 
     def test_install_local_e_tag(self, tmpdir):
         path = str(tmpdir)
-        # make the venv
-        self._set_git_tag('versioncheck')
         self._make_venv(path)
-        self._pip_install(path, ['-e', self.source_dir])
-        version_output = self._get_alc_version(path)
-        expected_tag = 'versioncheck'
-        if self._check_git_pushed() != 0:
-            expected_tag += '*'
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v='%s@%s' % (VERSION, expected_tag),
-            u=self.git_url
-        )
-        assert expected in version_output
+        test_src = self._git_clone_test()
+        self._pip_install(path, ['-e', test_src])
+        fpath = os.path.join(test_src, 'versionfinder_test_pkg', 'foo.py')
+        print("Creating junk file at %s" % fpath)
+        with open(fpath, 'w') as fh:
+            fh.write("testing")
+        commit = self._git_add_commit(test_src, 'versioncheck tag')
+        self._set_git_tag(test_src, 'versioncheck')
+        actual = self._get_version(path)
+        expected = self._expected_dict('versioncheck', TEST_MASTER_COMMIT)
+        assert sorted(actual) == sorted(expected)
 
     def test_install_local_e_multiple_remotes(self, tmpdir):
         path = str(tmpdir)
-        url = self.git_url
-        # make the venv
-        subprocess.call([
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with chdir(test_src):
+            subprocess.call([
                 'git',
                 'remote',
                 'add',
                 'testremote',
                 'https://github.com/jantman/awslimitchecker.git'
             ])
-        self._make_venv(path)
-        self._pip_install(path, ['-e', self.source_dir])
-        version_output = self._get_alc_version(path)
-        expected_commit = self.git_commit
-        if self._check_git_pushed() != 0:
-            expected_commit += '*'
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v='%s@%s' % (VERSION, expected_commit),
-            u=url
-        )
-        assert expected in version_output
+        self._pip_install(path, ['-e', test_src])
+        actual = self._get_version(path)
+        expected = self._expected_dict(
+            None, TEST_MASTER_COMMIT,
+            origin='https://github.com/jantman/awslimitchecker.git')
+        assert sorted(actual) == sorted(expected)
 
     def test_install_sdist(self, tmpdir):
         path = str(tmpdir)
-        # make the venv
         self._make_venv(path)
-        # build the sdist
-        pkg_path = self._make_package('sdist', path)
-        # install ALC in it
-        self._pip_install(path, [pkg_path])
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v=VERSION,
-            u='https://github.com/jantman/awslimitchecker'
-        )
-        assert expected in version_output
+        self._pip_install(path, [self.test_tarball])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)
 
     def test_install_sdist_pip154(self, tmpdir):
         """regression test for issue #55"""
         path = str(tmpdir)
-        # make the venv
         self._make_venv(path)
-        # build the sdist
-        pkg_path = self._make_package('sdist', path)
-        # ensure pip at 1.5.4
         self._pip_install(path, ['--force-reinstall', 'pip==1.5.4'])
-        # install ALC in it
-        self._pip_install(path, [pkg_path])
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v=VERSION,
-            u='https://github.com/jantman/awslimitchecker'
-        )
-        assert expected in version_output
+        self._pip_install(path, [self.test_tarball])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)
 
     def test_install_bdist_wheel(self, tmpdir):
         path = str(tmpdir)
-        # make the venv
         self._make_venv(path)
-        # build the sdist
-        pkg_path = self._make_package('bdist_wheel', path)
-        # install ALC in it
-        self._pip_install(path, [pkg_path])
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v=VERSION,
-            u='https://github.com/jantman/awslimitchecker'
-        )
-        assert expected in version_output
+        self._pip_install(path, [self.test_wheel])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)
 
-    # this doesn't work on PRs, because we can't check out the hash
-    @pytest.mark.skipif(os.environ.get('TRAVIS_PULL_REQUEST', 'false') !=
-                        'false', reason='git tests dont work on PRs')
     def test_install_git(self, tmpdir):
-        # https://pip.pypa.io/en/latest/reference/pip_install.html#git
-        status = self._check_git_pushed()
-        assert status != 1, "git clone not equal to origin"
-        assert status != 2, 'git clone is dirty'
-        commit = _get_git_commit()
         path = str(tmpdir)
-        # make the venv
         self._make_venv(path)
         self._pip_install(path, [
-            'git+https://github.com/jantman/awslimitchecker.git'
-            '@{c}#egg=awslimitchecker'.format(c=commit)
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
         ])
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v=VERSION,
-            u='https://github.com/jantman/awslimitchecker'
-        )
-        assert expected in version_output
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT)
+        assert sorted(actual) == sorted(expected)
 
-    def get_commit_or_tag(self):
-        """return tag if there is one, else commit"""
-        commit = _get_git_commit()
-        tag = _get_git_tag(commit)
-        print("Found commit=%s, tag=%s" % (commit, tag))
-        if tag is not None:
-            return tag
-        return commit
+    def test_install_git_commit(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._pip_install(path, [
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_MASTER_COMMIT
+            )
+        ])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT)
+        assert sorted(actual) == sorted(expected)
 
-    # this doesn't work on PRs, because we can't check out the hash
-    @pytest.mark.skipif(os.environ.get('TRAVIS_PULL_REQUEST', 'false') !=
-                        'false', reason='git tests dont work on PRs')
+    def test_install_git_tag(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._pip_install(path, [
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_TAG
+            )
+        ])
+        actual = self._get_version(path)
+        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_branch(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._pip_install(path, [
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_BRANCH
+            )
+        ])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_BRANCH_COMMIT)
+        assert sorted(actual) == sorted(expected)
+
     def test_install_git_e(self, tmpdir):
-        # https://pip.pypa.io/en/latest/reference/pip_install.html#git
-        print("### execute: git fetch --tags")
-        print(_check_output(['git', 'fetch', '--tags']))
-        print("### fetched DONE")
-        status = self._check_git_pushed()
-        assert status != 1, "git clone not equal to origin"
-        assert status != 2, 'git clone is dirty'
-        commit = self.get_commit_or_tag()
         path = str(tmpdir)
-        print(_check_output([
-            'git',
-            'show-ref',
-            '--tags'
-        ]).strip())
-        print("# commit=%s path=%s" % (commit, path))
-        # make the venv
         self._make_venv(path)
         self._pip_install(path, [
             '-e',
-            'git+https://github.com/jantman/awslimitchecker.git'
-            '@{c}#egg=awslimitchecker'.format(c=commit)
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
         ])
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v='%s@%s' % (VERSION, commit),
-            u='https://github.com/jantman/awslimitchecker.git'
-        )
-        assert expected in version_output
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT,
+                                       origin=TEST_GIT_HTTPS_URL)
+        assert sorted(actual) == sorted(expected)
 
-    # this doesn't work on PRs, because we can't check out the hash
-    @pytest.mark.skipif(os.environ.get('TRAVIS_PULL_REQUEST', 'false') !=
-                        'false', reason='git tests dont work on PRs')
-    def test_install_git_e_dirty(self, tmpdir):
-        # https://pip.pypa.io/en/latest/reference/pip_install.html#git
-        print("### execute: git fetch --tags")
-        print(_check_output(['git', 'fetch', '--tags']))
-        print("### fetched DONE")
-        status = self._check_git_pushed()
-        assert status != 1, "git clone not equal to origin"
-        assert status != 2, 'git clone is dirty'
-        commit = self.get_commit_or_tag()
+    def test_install_git_e_multiple_remotes(self, tmpdir):
         path = str(tmpdir)
-        print(_check_output([
-            'git',
-            'show-ref',
-            '--tags'
-        ]).strip())
-        print("# commit=%s path=%s" % (commit, path))
-        # make the venv
         self._make_venv(path)
         self._pip_install(path, [
             '-e',
-            'git+https://github.com/jantman/awslimitchecker.git'
-            '@{c}#egg=awslimitchecker'.format(c=commit)
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
         ])
-        fpath = os.path.join(path, 'src', 'awslimitchecker', 'testfile')
+        p = os.path.join(path, 'src', 'versionfinder-test-pkg')
+        with chdir(p):
+            subprocess.call([
+                'git',
+                'remote',
+                'add',
+                'testremote',
+                'https://github.com/jantman/awslimitchecker.git'
+            ])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT,
+                                       origin=TEST_GIT_HTTPS_URL)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_dirty(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._pip_install(path, [
+            '-e',
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL
+            )
+        ])
+        fpath = os.path.join(
+            path, 'src', 'versionfinder-test-pkg', 'versionfinder-test-pkg',
+            'foo.py'
+        )
         print("Creating junk file at %s" % fpath)
         with open(fpath, 'w') as fh:
             fh.write("testing")
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v='%s@%s*' % (VERSION, commit),
-            u='https://github.com/jantman/awslimitchecker.git'
-        )
-        assert expected in version_output
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT, dirty=True,
+                                       origin=TEST_GIT_HTTPS_URL)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_commit(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._pip_install(path, [
+            '-e',
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_MASTER_COMMIT
+            )
+        ])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_MASTER_COMMIT,
+                                       origin=TEST_GIT_HTTPS_URL)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_tag(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._pip_install(path, [
+            '-e',
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_TAG
+            )
+        ])
+        actual = self._get_version(path)
+        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT,
+                                       origin=TEST_GIT_HTTPS_URL)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_git_e_branch(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._pip_install(path, [
+            '-e',
+            'git+%s@%s#egg=versionfinder-test-pkg' % (
+                TEST_GIT_HTTPS_URL,
+                TEST_BRANCH
+            )
+        ])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, TEST_BRANCH_COMMIT,
+                                       origin=TEST_GIT_HTTPS_URL)
+        assert sorted(actual) == sorted(expected)
 
     def test_install_sdist_in_git_repo(self, tmpdir):
         """regression test for issue #73"""
         path = str(tmpdir)
-        # setup a git repo in tmpdir
         self._make_git_repo(path)
-        # make the venv
         self._make_venv(path)
-        # build the sdist
-        pkg_path = self._make_package('sdist', path)
-        # install ALC in it
-        self._pip_install(path, [pkg_path])
-        version_output = self._get_alc_version(path)
-        expected = 'awslimitchecker {v} (see <{u}> for source code)'.format(
-            v=VERSION,
-            u='https://github.com/jantman/awslimitchecker'
-        )
-        assert expected in version_output
+        self._pip_install(path, [self.test_tarball])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_wheel_in_git_repo(self, tmpdir):
+        """regression test for issue #73"""
+        path = str(tmpdir)
+        self._make_git_repo(path)
+        self._make_venv(path)
+        self._pip_install(path, [self.test_wheel])
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_setuppy_develop(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with chdir(test_src):
+            cmd = [
+                os.path.join(path, 'bin', 'python'),
+                os.path.join(test_src, 'setup.py'),
+                'develop'
+            ]
+            print_header('running: %s' % ' '.join(cmd))
+            output = _check_output(cmd, stderr=subprocess.STDOUT)
+            print(output)
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_setuppy_install(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with chdir(test_src):
+            cmd = [
+                os.path.join(path, 'bin', 'python'),
+                os.path.join(test_src, 'setup.py'),
+                'install'
+            ]
+            print_header('running: %s' % ' '.join(cmd))
+            output = _check_output(cmd, stderr=subprocess.STDOUT)
+            print(output)
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_setuppy_install_egg_info(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with chdir(test_src):
+            cmd = [
+                os.path.join(path, 'bin', 'python'),
+                os.path.join(test_src, 'setup.py'),
+                'install_egg_info'
+            ]
+            print_header('running: %s' % ' '.join(cmd))
+            output = _check_output(cmd, stderr=subprocess.STDOUT)
+            print(output)
+        actual = self._get_version(path)
+        expected = self._expected_dict(None, None)
+        assert sorted(actual) == sorted(expected)

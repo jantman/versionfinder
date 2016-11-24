@@ -34,3 +34,15 @@ AUTHORS:
 Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ##################################################################################
 """
+
+from versionfinder import VersionFinder
+
+
+def find_version(*args, **kwargs):
+    """
+    Wrapper around :py:class:`~.VersionFinder` and its
+    :py:meth:`~.VersionFinder.find_package_version` method. Pass arguments and
+    kwargs to VersionFinder constructor, return the value of its
+    ``find_package_version`` method.
+    """
+    return VersionFinder(*args, **kwargs).find_package_version()

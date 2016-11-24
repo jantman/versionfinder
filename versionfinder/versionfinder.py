@@ -86,8 +86,9 @@ class VersionFinder(object):
         if package_file is not None:
             self.package_file = package_file
         else:
-            frame = inspect.stack()[1]
-            self.package_file = os.path.abspath(frame.filename)
+            frame = inspect.stack()[1][0]
+            self.package_file = os.path.abspath(
+                inspect.getframeinfo(frame).filename)
         self.package_dir = os.path.dirname(self.package_file)
 
     def find_package_version(self):
@@ -125,19 +126,22 @@ class VersionFinder(object):
         res = {
             'version': None,
             'url': None,
-            'tag': None,
-            'commit': None
+            'git_tag': None,
+            'git_commit': None,
+            'git_origin': None,
+            'git_is_dirty': None
         }
         if self._is_git_clone:
             git_info = self._find_git_info()
             logger.debug("Git info: %s", git_info)
             for k, v in git_info.items():
+                if k == 'dirty':
+                    res['git_is_dirty'] = v
+                    continue
+                if k == 'url':
+                    res['git_origin'] = v
                 if v is not None:
                     res[k] = v
-            if git_info['dirty'] and res['tag'] is not None:
-                res['tag'] += '*'
-            if git_info['dirty'] and res['commit'] is not None:
-                res['commit'] += '*'
         else:
             logger.debug("Install does not appear to be a git clone")
         try:
@@ -182,7 +186,7 @@ class VersionFinder(object):
         :returns: information from pkg_resources about 'versionfinder'
         :rtype: dict
         """
-        dist = pkg_resources.require('versionfinder')[0]
+        dist = pkg_resources.require(self.package_name)[0]
         ver, url = self._dist_version_url(dist)
         return {'version': ver, 'url': url}
 
@@ -197,7 +201,7 @@ class VersionFinder(object):
         res = {}
         dist = None
         for d in pip.get_installed_distributions():
-            if d.project_name == 'versionfinder':
+            if d.project_name == self.package_name:
                 dist = d
         if dist is None:
             return res
