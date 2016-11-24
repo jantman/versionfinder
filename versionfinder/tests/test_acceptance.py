@@ -92,30 +92,10 @@ class TestAcceptance(object):
         print("\n")
         self._set_git_config()
         self.current_venv_path = sys.prefix
-        self.source_dir = self._get_source_dir()
         self.git_commit = _get_git_commit()
         self.git_url = _get_git_url()
         self.test_tarball = self._get_package(TEST_TARBALL)
         self.test_wheel = self._get_package(TEST_WHEEL)
-
-    def teardown_method(self, method):
-        tag = _get_git_tag(self.git_commit)
-        print("\n")
-        try:
-            if 'testremote' in _check_output([
-                'git',
-                'remote',
-                '-v'
-            ]):
-                print("Removing 'testremote' git remote")
-                subprocess.call([
-                    'git',
-                    'remote',
-                    'remove',
-                    'testremote'
-                ])
-        except subprocess.CalledProcessError:
-            pass
 
     def _set_git_config(self, set_in_travis=False):
         if not set_in_travis and os.environ.get('TRAVIS', '') != 'true':
@@ -224,27 +204,6 @@ class TestAcceptance(object):
         # install our source in the venv
         self._pip_install(path, [self.source_dir])
 
-    def _get_source_dir(self):
-        """
-        Determine the directory containing the project source. This is assumed
-        to be either the TOXINIDIR environment variable, or determined relative
-        to this file.
-
-        :returns: path to the awslimitchecker source
-        :rtype: str
-        """
-        s = os.environ.get('TOXINIDIR', None)
-        if s is None:
-            s = os.path.abspath(
-                os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)),
-                    '..',
-                    '..'
-                )
-            )
-        assert os.path.exists(s)
-        return s
-
     def _pip_install(self, path, args):
         """
         In the virtualenv at ``path``, run ``pip install [args]``.
@@ -299,20 +258,6 @@ class TestAcceptance(object):
         j = json.loads(res.strip())
         return j
 
-    def _get_git_status(self, path):
-        header = "#" * 20 + " _get_git_status() running: git status in: " \
-                            "%s " % path + "#" * 20
-        with chdir(path):
-            try:
-                status = _check_output(['git', 'status'],
-                                       stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError:
-                status = ''
-        footer = "#" * 20 + " DONE: git status " + "#" * 20
-        if status == '':
-            return "\n# git status exited non-0\n"
-        return "\n" + header + "\n" + status + "\n" + footer + "\n"
-
     def _git_checkout(self, path, ref):
         cmd = ['git', 'checkout', '-f', ref]
         print_header("_git_checkout() running: '%s' in: %s" % (
@@ -321,74 +266,6 @@ class TestAcceptance(object):
             output = _check_output(cmd, stderr=subprocess.STDOUT)
             print(output)
         print_header('DONE')
-
-    def _make_package(self, pkg_type, test_tmp_dir):
-        """
-        Use setup.py in the current (tox) virtualenv to build a package
-        of the current project, of the specified ``pkg_type`` (sdist|bdist|
-        bdist_wheel). Return the absolute path to the created archive/
-        package.
-
-        :param pkg_type: str, type of package to create
-        :param test_tmp_dir: str, temporary dir for this test
-        :return: absolute path to the package file
-        :rtype: str
-        """
-        pkgdir = os.path.join(test_tmp_dir, 'pkg')
-        if os.path.exists(pkgdir):
-            print("removing: %s" % pkgdir)
-            shutil.rmtree(pkgdir)
-        args = [
-            sys.executable,
-            os.path.join(self.source_dir, 'setup.py'),
-            pkg_type,
-            '--dist-dir',
-            pkgdir
-        ]
-        assert os.path.exists(
-            args[0]) is True, "path does not exist: %s" % args[0]
-        assert os.path.exists(
-            args[1]) is True, "path does not exist: %s" % args[1]
-        print("\n" + "#" * 20 + " running: " + ' '.join(args) + "#" * 20)
-        print("# cwd: %s\n" % os.getcwd())
-        try:
-            subprocess.call(args)
-        except Exception as ex:
-            print("\nFAILED:")
-            print(ex)
-            print("\n")
-        print("\n" + "#" * 20 + " DONE: " + ' '.join(args) + "#" * 20)
-        assert os.path.exists(
-            args[4]) is True, "path does not exist: %s" % args[4]
-        files = os.listdir(pkgdir)
-        assert len(files) == 1
-        fpath = os.path.join(pkgdir, files[0])
-        assert os.path.exists(fpath) is True
-        return fpath
-
-    def _check_git_pushed(self):
-        """
-        returns a trinary:
-        0 - up-to-date and clean
-        1 - not equal to origin
-        2 - dirty
-
-        :return: int
-        """
-        status = _check_output([
-            'git',
-            'status',
-            '-u'
-        ]).strip()
-        if ('Your branch is up-to-date with' not in status and
-                'HEAD detached at' not in status and
-                '# Not currently on any branch' not in status):
-            print("\ngit status -u:\n" + status + "\n")
-            return 1
-        if 'nothing to commit' not in status:
-            print("\ngit status -u:\n" + status + "\n")
-            return 2
-        return 0
 
     def _git_clone_test(self, ref=None):
         """
@@ -751,23 +628,6 @@ class TestAcceptance(object):
                 os.path.join(path, 'bin', 'python'),
                 os.path.join(test_src, 'setup.py'),
                 'install'
-            ]
-            print_header('running: %s' % ' '.join(cmd))
-            output = _check_output(cmd, stderr=subprocess.STDOUT)
-            print(output)
-        actual = self._get_version(path)
-        expected = self._expected_dict(None, None)
-        assert sorted(actual) == sorted(expected)
-
-    def test_install_setuppy_install_egg_info(self, tmpdir):
-        path = str(tmpdir)
-        self._make_venv(path)
-        test_src = self._git_clone_test()
-        with chdir(test_src):
-            cmd = [
-                os.path.join(path, 'bin', 'python'),
-                os.path.join(test_src, 'setup.py'),
-                'install_egg_info'
             ]
             print_header('running: %s' % ' '.join(cmd))
             output = _check_output(cmd, stderr=subprocess.STDOUT)
