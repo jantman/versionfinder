@@ -92,10 +92,31 @@ class TestAcceptance(object):
         print("\n")
         self._set_git_config()
         self.current_venv_path = sys.prefix
-        self.git_commit = _get_git_commit()
-        self.git_url = _get_git_url()
+        self.source_dir = self._get_source_dir()
         self.test_tarball = self._get_package(TEST_TARBALL)
         self.test_wheel = self._get_package(TEST_WHEEL)
+
+    def _get_source_dir(self):
+        """
+        Determine the directory containing the project source. This is assumed
+        to be either the TOXINIDIR environment variable, or determined relative
+        to this file.
+
+        :returns: path to the awslimitchecker source
+        :rtype: str
+        """
+
+        s = os.environ.get('TOXINIDIR', None)
+        if s is None:
+            s = os.path.abspath(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    '..',
+                    '..'
+                )
+            )
+        assert os.path.exists(s)
+        return s
 
     def _set_git_config(self, set_in_travis=False):
         if not set_in_travis and os.environ.get('TRAVIS', '') != 'true':
@@ -526,7 +547,7 @@ class TestAcceptance(object):
             )
         ])
         fpath = os.path.join(
-            path, 'src', 'versionfinder-test-pkg', 'versionfinder-test-pkg',
+            path, 'src', 'versionfinder-test-pkg', 'versionfinder_test_pkg',
             'foo.py'
         )
         print("Creating junk file at %s" % fpath)
