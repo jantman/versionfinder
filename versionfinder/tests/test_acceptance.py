@@ -305,10 +305,10 @@ class AcceptanceHelpers(object):
         """
         args = [os.path.join(path, 'bin', 'versionfinder-test')]
         print_header("_get_version() running: " + ' '.join(args))
-        res = _check_output(args)
+        res = _check_output(args, stderr=subprocess.STDOUT)
         print(res)
         print('DONE')
-        j = json.loads(res.strip())
+        j = json.loads(res.strip().split("\n")[-1])
         return strip_unicode(j)
 
     def _get_result(self, d):
@@ -390,59 +390,6 @@ class AcceptanceHelpers(object):
             for chunk in r:
                 fh.write(chunk)
         return p
-
-
-@pytest.mark.acceptance
-class DONOTTestTest(AcceptanceHelpers):
-
-    def test_passing(self, capsys, tmpdir):
-        print("foo print")
-        sys.stdout.write("foo stdout\n")
-        sys.stderr.write("bar stderr\n")
-        with capsys_disabled(capsys):
-            print("\n%s() printcapsys" % inspect.stack()[0][0].f_code.co_name)
-        print("bar print")
-        sys.stdout.write("bar stdout\n")
-        sys.stderr.write("bar stderr\n")
-        self._make_venv(str(tmpdir))
-        print("baz print")
-        sys.stdout.write("baz stdout\n")
-        sys.stderr.write("baz stderr\n")
-        assert 1 == 1
-
-    def test_failing(self, capsys, tmpdir):
-        print("foo print")
-        sys.stdout.write("foo stdout\n")
-        sys.stderr.write("bar stderr\n")
-        with capsys_disabled(capsys):
-            print("\n%s() printcapsys" % inspect.stack()[0][0].f_code.co_name)
-        print("bar print")
-        sys.stdout.write("bar stdout\n")
-        sys.stderr.write("bar stderr\n")
-        self._make_venv(str(tmpdir))
-        print("baz print")
-        sys.stdout.write("baz stdout\n")
-        sys.stderr.write("baz stderr\n")
-        assert 1 == 0
-
-    def _make_venv(self, path):
-        """
-        Create a venv in ``path``. Make sure it exists.
-
-        :param path: filesystem path to directory to make the venv base
-        """
-        virtualenv = os.path.join(str(sys.prefix), 'bin', 'virtualenv')
-        assert os.path.exists(virtualenv) is True, 'virtualenv not found'
-        args = [str(virtualenv), str(path)]
-        print_header(" _make_venv() running: " + ' '.join(args))
-        try:
-            res = _check_output(args, stderr=subprocess.STDOUT)
-            print(res)
-            print_header("DONE")
-        except subprocess.CalledProcessError:
-            print_header('FAILED')
-        pypath = os.path.join(path, 'bin', 'python')
-        assert os.path.exists(pypath) is True, "does not exist: %s" % pypath
 
 
 @pytest.mark.acceptance
