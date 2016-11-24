@@ -68,12 +68,17 @@ logger = logging.getLogger(__name__)
 
 class VersionFinder(object):
 
-    def __init__(self, package_name, package_file=None):
+    def __init__(self, package_name, package_file=None, log=False):
         """
         Initialize a VersionFinder to find version information of the named
         package, which includes a given file. ``package_file`` must be a Python
         file in the package; if not specified, the file calling this class
         will be used.
+
+        VersionFinder logs rather verbosely to ``logging.debug()`` if ``log``
+        is True. To simplify use as a library, unless you set ``log`` to True,
+        versionfinder's logger will be set to a level of ``logging.CRITICAL``,
+        suppressing all log messages. This will also silence the ``pip`` logger.
 
         :param package_name: name of the package to find information about
         :type package_name: str
@@ -82,6 +87,11 @@ class VersionFinder(object):
           this class will be used
         :type package_file: str
         """
+        if not log:
+            logger.setLevel(logging.CRITICAL)
+            pip_log = logging.getLogger("pip")
+            pip_log.setLevel(logging.CRITICAL)
+            pip_log.propagate = True
         self.package_name = package_name
         if package_file is not None:
             self.package_file = package_file
@@ -115,14 +125,6 @@ class VersionFinder(object):
         :returns: information about the installed version of the package
         :rtype: dict
         """
-        if os.environ.get('VERSIONCHECK_DEBUG', '') != 'true':
-            # silence logging
-            logger.setLevel(logging.WARNING)
-            # silence pip logging
-            pip_log = logging.getLogger("pip")
-            pip_log.setLevel(logging.WARNING)
-            pip_log.propagate = True
-
         res = {
             'version': None,
             'url': None,
