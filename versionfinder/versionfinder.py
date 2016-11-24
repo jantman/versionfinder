@@ -99,7 +99,9 @@ class VersionFinder(object):
             frame = inspect.stack()[1][0]
             self.package_file = os.path.abspath(
                 inspect.getframeinfo(frame).filename)
+            logger.debug("Found package_file as: %s", self.package_file)
         self.package_dir = os.path.dirname(self.package_file)
+        logger.debug('package_dir: %s' % self.package_dir)
 
     def find_package_version(self):
         """
@@ -150,6 +152,7 @@ class VersionFinder(object):
             pip_info = self._find_pip_info()
         except Exception:
             # we NEVER want this to crash the program
+            logger.debug('Caught exception running _find_pip_info()')
             pip_info = {}
         logger.debug("pip info: %s", pip_info)
         if 'version' in pip_info:
@@ -159,6 +162,7 @@ class VersionFinder(object):
         try:
             pkg_info = self._find_pkg_info()
         except Exception:
+            logger.debug('Caught exception running _find_pkg_info()')
             pkg_info = {}
         logger.debug("pkg_resources info: %s", pkg_info)
         if 'version' in pkg_info and res['version'] is None:
@@ -178,7 +182,9 @@ class VersionFinder(object):
         """
         for p in self._package_top_dir:
             if os.path.exists(os.path.join(p, '.git')):
+                logger.debug('_is_git_clone() true based on %s/.git' % p)
                 return True
+        logger.debug('_is_git_clone() false')
         return False
 
     def _find_pkg_info(self):
@@ -206,11 +212,14 @@ class VersionFinder(object):
             if d.project_name == self.package_name:
                 dist = d
         if dist is None:
+            logger.debug('could not find dist matching package_name')
             return res
+        logger.debug('found dist: %s', dist)
         ver, url = self._dist_version_url(dist)
         res['version'] = ver
         # this is a bit of an ugly, lazy hack...
         req = pip.FrozenRequirement.from_dist(dist, [])
+        logger.debug('pip FrozenRequirement: %s', req)
         if ':' in req.req or '@' in req.req:
             res['url'] = req.req
         else:
@@ -244,22 +253,16 @@ class VersionFinder(object):
         :rtype: dict
         """
         res = {'url': None, 'tag': None, 'commit': None, 'dirty': None}
-        oldcwd = os.getcwd()
-        logger.debug("Current directory: %s", oldcwd)
-        logger.debug("This file: %s (%s)", __file__, os.path.abspath(__file__))
-        newdir = os.path.dirname(os.path.abspath(__file__))
-        logger.debug("cd to %s", newdir)
-        os.chdir(newdir)
-        res['commit'] = _get_git_commit()
-        if res['commit'] is not None:
-            res['tag'] = _get_git_tag(res['commit'])
-            res['url'] = _get_git_url()
-        try:
-            res['dirty'] = self._is_git_dirty()
-        except Exception:
-            pass
-        logger.debug("cd back to %s", oldcwd)
-        os.chdir(oldcwd)
+        newdir = os.path.dirname(os.path.abspath(self.package_dir))
+        with chdir(newdir):
+            res['commit'] = _get_git_commit()
+            if res['commit'] is not None:
+                res['tag'] = _get_git_tag(res['commit'])
+                res['url'] = _get_git_url()
+            try:
+                res['dirty'] = self._is_git_dirty()
+            except Exception:
+                pass
         return res
 
     def _is_git_dirty(self):
@@ -275,6 +278,7 @@ class VersionFinder(object):
                 'status',
                 '-u'
             ], stderr=DEVNULL).strip()
+        logger.debug('git status: %s', status)
         if (('Your branch is up-to-date with' not in status and
                 'HEAD detached at' not in status and
                 'Not currently on any branch' not in status) or
@@ -357,8 +361,10 @@ def _get_git_tag(commit):
             commit
         ], stderr=DEVNULL).strip()
     except subprocess.CalledProcessError:
+        logger.debug('Exception caught')
         tag = None
     if tag == '':
+        logger.debug('tag output empty')
         return None
     return tag
 
@@ -376,7 +382,9 @@ def _get_git_url():
             'git',
             'remote',
             '-v'
-        ], stderr=DEVNULL).strip().split("\n")
+        ], stderr=DEVNULL).strip()
+        logger.debug('git remotes: %s' % lines)
+        lines = lines.split("\n")
         urls = {}
         for line in lines:
             parts = re.split(r'\s+', line)
@@ -388,8 +396,10 @@ def _get_git_url():
         for k, v in sorted(urls.items()):
             return v
     except subprocess.CalledProcessError:
+        logger.debug('CalledProcessError listing git remotes')
         url = None
     except IndexError:
+        logger.debug('IndexError getting git remotes', exc_info=True)
         url = None
     return url
 
@@ -397,6 +407,7 @@ def _get_git_url():
 @contextmanager
 def chdir(path):
     old_dir = os.getcwd()
+    logger.debug('with chdir(%s) from %s', path, old_dir)
     os.chdir(path)
     try:
         yield
