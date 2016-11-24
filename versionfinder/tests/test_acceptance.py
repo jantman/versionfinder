@@ -46,7 +46,13 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 @TODO:
 
 Install methods should include:
-- install from a fork
+- install from a fork (pip git editable; with and without upstream remote)
+- pip install egg
+- conda? http://conda.pydata.org/docs/intro.html
+- easy_install https://setuptools.readthedocs.io/en/latest/easy_install.html
+  - tarball
+  - egg
+  - source directory
 """
 
 import pytest
@@ -68,13 +74,14 @@ logger = logging.getLogger(__name__)
 
 TEST_PROJECT = 'versionfinder_test_pkg'
 TEST_GIT_HTTPS_URL = 'https://github.com/jantman/versionfinder-test-pkg.git'
+TEST_FORK_HTTPS_URL = 'https://github.com/sniknej/versionfinder-test-pkg.git'
 TEST_PROJECT_URL = 'https://github.com/jantman/versionfinder-test-pkg'
-TEST_VERSION = '0.2.2'
-TEST_TAG = '0.2.2'
-TEST_TAG_COMMIT = 'cd4a19b4d6aed8bc9355711a3150fb316d5c9bb6'
-TEST_MASTER_COMMIT = '4cd3029d7e872f0a77fe2453e453850b86425bb3'
+TEST_VERSION = '0.2.4'
+TEST_TAG = '0.2.4'
+TEST_TAG_COMMIT = 'a72095ff7189ed4fe4d5d39c005a9014ee4a93d9'
+TEST_MASTER_COMMIT = 'aca2af99cc5cd7ba899a81ce50ec66d467778d13'
 TEST_BRANCH = 'testbranch'
-TEST_BRANCH_COMMIT = '4a77d6fd9362a4ccd772277f16a4a74a5b201ca6'
+TEST_BRANCH_COMMIT = 'de452bfe6f04a2404c728a2799b2ce9f50f9da3d'
 
 TEST_TARBALL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
                'download/{ver}/versionfinder_test_pkg-{ver}.tar' \
@@ -102,6 +109,26 @@ def capsys_disabled(capsys):
 
 
 class AcceptanceHelpers(object):
+    """
+    Long-running acceptance tests for VersionFinder.
+
+    The purpose of these tests is to create virtualenvs and then install an
+    example package (https://github.com/jantman/versionfinder-test-pkg) in them
+    using a variety of methods (i.e. setup.py, pip install from directory,
+    git URL, tarball or wheel, etc.), and then call the package's console entry
+    point (``versionfinder-test``) which calls ``versionfinder.find_version()``
+    from a number of different locations in the package tree, and finally writes
+    JSON to STDOUT describing the result of each of the ``find_version()`` calls
+    (and any exceptions they raised). We then compare them to each other and,
+    assuming they're all identical, compare them to our expected output.
+
+    The goal is to confirm that versionfinder returns the correct information
+    when the target package is installed with as many different methods as
+    possible.
+
+    This class defines a bunch of helper methods, which are used in the tests
+    (in subclasses).
+    """
 
     def setup_method(self, method):
         os.environ['VERSIONCHECK_DEBUG'] = 'true'
@@ -202,7 +229,12 @@ class AcceptanceHelpers(object):
     def _set_git_tag(self, path, tagname):
         """set a git tag for the current commit"""
         with chdir(path):
-            print("Creating git tag 'versiontest' of %s" % self.git_commit)
+            commit = _check_output([
+                'git',
+                'rev-parse',
+                'HEAD'
+            ]).strip()
+            print("Creating git tag 'versiontest' of %s" % commit)
             res = _check_output([
                 'git',
                 'tag',
@@ -276,7 +308,7 @@ class AcceptanceHelpers(object):
         final_args = [pip, 'install']
         final_args.extend(args)
         print_header("_pip_install() running: " + ' '.join(final_args))
-        _check_output(final_args)
+        _check_output(final_args, stderr=subprocess.STDOUT)
         print_header('DONE')
 
     def _make_git_repo(self, path):
@@ -393,28 +425,7 @@ class AcceptanceHelpers(object):
 
 
 @pytest.mark.acceptance
-class TestAcceptance(AcceptanceHelpers):
-    """
-    Long-running acceptance tests for VersionFinder.
-
-    The purpose of these tests is to create virtualenvs and then install an
-    example package (https://github.com/jantman/versionfinder-test-pkg) in them
-    using a variety of methods (i.e. setup.py, pip install from directory,
-    git URL, tarball or wheel, etc.), and then call the package's console entry
-    point (``versionfinder-test``) which calls ``versionfinder.find_version()``
-    from a number of different locations in the package tree, and finally writes
-    JSON to STDOUT describing the result of each of the ``find_version()`` calls
-    (and any exceptions they raised). We then compare them to each other and,
-    assuming they're all identical, compare them to our expected output.
-
-    The goal is to confirm that versionfinder returns the correct information
-    when the target package is installed with as many different methods as
-    possible.
-    """
-
-    ################
-    # Actual Tests #
-    ################
+class TestPip(AcceptanceHelpers):
 
     def test_install_local_master(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -478,7 +489,7 @@ class TestAcceptance(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': True,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -529,7 +540,7 @@ class TestAcceptance(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_TAG_COMMIT,
                 'git_tag': TEST_TAG,
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -552,7 +563,7 @@ class TestAcceptance(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_TAG_COMMIT,
                 'git_tag': TEST_TAG,
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -664,9 +675,9 @@ class TestAcceptance(AcceptanceHelpers):
         expected = {
             'failed': False,
             'result': {
-                'git_commit': TEST_MASTER_COMMIT,
+                'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -692,7 +703,7 @@ class TestAcceptance(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -716,9 +727,9 @@ class TestAcceptance(AcceptanceHelpers):
         expected = {
             'failed': False,
             'result': {
-                'git_commit': TEST_MASTER_COMMIT,
+                'git_commit': None,
                 'git_tag': TEST_TAG,
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -742,9 +753,9 @@ class TestAcceptance(AcceptanceHelpers):
         expected = {
             'failed': False,
             'result': {
-                'git_commit': TEST_BRANCH_COMMIT,
-                'git_tag': None,
-                'git_origin': None,
+                'git_commit': None,
+                'git_tag': TEST_BRANCH,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -967,7 +978,10 @@ class TestAcceptance(AcceptanceHelpers):
         }
         assert sorted(actual) == sorted(expected)
 
-    def test_install_setuppy_develop(self, capsys, tmpdir):
+@pytest.mark.acceptance
+class TestSetupPy(AcceptanceHelpers):
+
+    def test_develop(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
@@ -987,17 +1001,17 @@ class TestAcceptance(AcceptanceHelpers):
         expected = {
             'failed': False,
             'result': {
-                'git_commit': None,
+                'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': None,
-                'git_is_dirty': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
 
-    def test_install_setuppy_install(self, capsys, tmpdir):
+    def test_install(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
