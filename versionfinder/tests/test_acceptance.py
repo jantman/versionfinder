@@ -277,7 +277,7 @@ class TestAcceptance(object):
         print(res)
         print('DONE')
         j = json.loads(res.strip())
-        return j
+        return strip_unicode(j)
 
     def _git_checkout(self, path, ref):
         cmd = ['git', 'checkout', '-f', ref]
@@ -402,6 +402,26 @@ class TestAcceptance(object):
         self._set_git_tag(test_src, 'versioncheck')
         actual = self._get_version(path)
         expected = self._expected_dict('versioncheck', TEST_MASTER_COMMIT)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_local_e_checkout_tag(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        self._pip_install(path, ['-e', test_src])
+        self._git_checkout(test_src, TEST_TAG)
+        actual = self._get_version(path)
+        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT)
+        assert sorted(actual) == sorted(expected)
+
+    def test_install_local_e_checkout_commit(self, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        self._pip_install(path, ['-e', test_src])
+        self._git_checkout(test_src, TEST_TAG_COMMIT)
+        actual = self._get_version(path)
+        expected = self._expected_dict(TEST_TAG, TEST_TAG_COMMIT)
         assert sorted(actual) == sorted(expected)
 
     def test_install_local_e_multiple_remotes(self, tmpdir):
@@ -656,3 +676,14 @@ class TestAcceptance(object):
         actual = self._get_version(path)
         expected = self._expected_dict(None, None)
         assert sorted(actual) == sorted(expected)
+
+def strip_unicode(d):
+    n = {}
+    for k, v in d.iteritems():
+        if isinstance(v, type({})):
+            n[str(k)] = strip_unicode(v)
+        elif v is True or v is False or v is None:
+            n[str(k)] = v
+        else:
+            n[str(k)] = str(v)
+    return n
