@@ -75,10 +75,13 @@ TEST_TAG_COMMIT = 'e6a8778111043d0d0172281f3a33b0c00bd239b9'
 TEST_MASTER_COMMIT = '2665f9969af060a876db4dc3b030dabc15034c41'
 TEST_BRANCH = 'testbranch'
 TEST_BRANCH_COMMIT = '1b289fdf7e187cb8a67c8e1dd9aafeb54c389c8f'
+
 TEST_TARBALL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
-               'download/0.2.1/versionfinder_test_pkg-0.2.1.tar.gz'
+               'download/{ver}/versionfinder_test_pkg-{ver}.tar' \
+               '.gz'.format(ver=TEST_VERSION)
 TEST_WHEEL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
-             'download/0.2.1/versionfinder_test_pkg-0.2.1-py2.py3-none-any.whl'
+             'download/{ver}/versionfinder_test_pkg-{ver}-py2.py3-none-any' \
+             '.whl'.format(ver=TEST_VERSION)
 
 
 @contextmanager
@@ -98,8 +101,299 @@ def capsys_disabled(capsys):
         capmanager.resumecapture()
 
 
+class AcceptanceHelpers(object):
+
+    def setup_method(self, method):
+        os.environ['VERSIONCHECK_DEBUG'] = 'true'
+        print("\n")
+        self._set_git_config()
+        self.current_venv_path = sys.prefix
+        self.source_dir = self._get_source_dir()
+        self.test_tarball = self._get_package(TEST_TARBALL)
+        self.test_wheel = self._get_package(TEST_WHEEL)
+
+    def _get_source_dir(self):
+        """
+        Determine the directory containing the project source. This is assumed
+        to be either the TOXINIDIR environment variable, or determined relative
+        to this file.
+
+        :returns: path to the awslimitchecker source
+        :rtype: str
+        """
+
+        s = os.environ.get('TOXINIDIR', None)
+        if s is None:
+            s = os.path.abspath(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    '..',
+                    '..'
+                )
+            )
+        assert os.path.exists(s)
+        return s
+
+    def _git_add_remote(self, path, rmt_name, rmt_url):
+        """
+        Add a git remote to the repo at path
+
+        :param path: path to the git repo
+        :type path: str
+        :param rmt_name: name for the remote
+        :type rmt_name: str
+        :param rmt_url: URL for the remote
+        :type rmt_url: str
+        """
+        args = [
+            'git',
+            'remote',
+            'add',
+            rmt_name,
+            rmt_url
+        ]
+        with chdir(path):
+            res = _check_output(args)
+            print(res)
+
+    def _set_git_config(self, set_in_travis=False):
+        if not set_in_travis and os.environ.get('TRAVIS', '') != 'true':
+            print("not running in Travis; not setting git config")
+            return
+        try:
+            res = _check_output([
+                'git',
+                'config',
+                'user.email'
+            ]).strip()
+        except subprocess.CalledProcessError as ex:
+            res = None
+        if res != '' and res is not None:
+            print("Got git config user.email as %s" % res)
+        else:
+            res = _check_output([
+                'git',
+                'config',
+                'user.email',
+                'travisci@jasonantman.com'
+            ])
+            print("Set git config user.email:\n%s" % res)
+        # name
+        try:
+            res = _check_output([
+                'git',
+                'config',
+                'user.name'
+            ]).strip()
+        except subprocess.CalledProcessError as ex:
+            print(ex)
+            res = None
+        if res != '' and res is not None:
+            print("Got git config user.name as %s" % res)
+        else:
+            res = _check_output([
+                'git',
+                'config',
+                'user.name',
+                'travisci'
+            ])
+            print("Set git config user.name:\n%s" % res)
+
+    def _set_git_tag(self, path, tagname):
+        """set a git tag for the current commit"""
+        with chdir(path):
+            print("Creating git tag 'versiontest' of %s" % self.git_commit)
+            res = _check_output([
+                'git',
+                'tag',
+                '-a',
+                '-m',
+                tagname,
+                tagname
+            ])
+            print(res)
+            print("Source git tag: %s" % tagname)
+        return tagname
+
+    def _git_add_commit(self, path, commit_msg):
+        """
+        git add -A and git commit -m commit_msg in ``path``.
+        """
+        print_header('_git_add_commit(%s, %s)' % (path, commit_msg))
+        with chdir(path):
+            out = _check_output([
+                'git',
+                'add',
+                '-A'
+            ])
+            print(out)
+            out = _check_output([
+                'git',
+                'commit',
+                '-m',
+                '"%s"' % commit_msg
+            ])
+            print(out)
+            out = _check_output([
+                'git',
+                'rev-parse',
+                'HEAD'
+            ]).strip()
+        return out
+
+    def _make_venv(self, path):
+        """
+        Create a venv in ``path``. Make sure it exists.
+
+        :param path: filesystem path to directory to make the venv base
+        """
+        virtualenv = os.path.join(self.current_venv_path, 'bin', 'virtualenv')
+        assert os.path.exists(virtualenv) is True, 'virtualenv not found'
+        args = [virtualenv, path]
+        print_header(" _make_venv() running: " + ' '.join(args))
+        try:
+            res = _check_output(args, stderr=subprocess.STDOUT)
+            print(res)
+            print_header("DONE")
+        except subprocess.CalledProcessError:
+            print_header('FAILED')
+        pypath = os.path.join(path, 'bin', 'python')
+        assert os.path.exists(pypath) is True, "does not exist: %s" % pypath
+        # install our source in the venv
+        self._pip_install(path, [self.source_dir])
+
+    def _pip_install(self, path, args):
+        """
+        In the virtualenv at ``path``, run ``pip install [args]``.
+
+        :param path: venv base/root path
+        :param args: ``pip install`` arguments
+        """
+        pip = os.path.join(path, 'bin', 'pip')
+        # get pip version
+        res = _check_output([pip, '--version']).strip()
+        # install ALC in it
+        final_args = [pip, 'install']
+        final_args.extend(args)
+        print_header("_pip_install() running: " + ' '.join(final_args))
+        _check_output(final_args)
+        print_header('DONE')
+
+    def _make_git_repo(self, path):
+        """create a git repo under path; return the commit"""
+        print_header("creating git repository in %s" % path)
+        with chdir(path):
+            _check_output(['git', 'init', '.'])
+            with open('foo', 'w') as fh:
+                fh.write('foo')
+            _check_output(['git', 'add', 'foo'])
+            self._set_git_config(set_in_travis=True)
+            _check_output(['git', 'commit', '-m', 'foo'])
+            commit = _get_git_commit()
+            print_header("git repository in %s commit: %s" % (path, commit))
+        return commit
+
+    def _get_version(self, path):
+        """
+        In the virtualenv at ``path``, run ``versionfinder-test`` and
+        return the JSON-decoded output dict.
+
+        :param path: venv base/root path
+        :type path: str
+        :return: versionfinder-test command output
+        :rtype: dict
+        """
+        args = [os.path.join(path, 'bin', 'versionfinder-test')]
+        print_header("_get_version() running: " + ' '.join(args))
+        res = _check_output(args)
+        print(res)
+        print('DONE')
+        j = json.loads(res.strip())
+        return strip_unicode(j)
+
+    def _get_result(self, d):
+        """
+        Given the raw (JSON-decoded) result dict from :py:meth:`~._get_version`,
+        iterate through all of the keys. Assert that their values are all
+        identical, and don't contain exceptions. Return the identical result
+        dict.
+
+        :param d: result dict from :py:meth:`~._get_version`
+        :type d: dict
+        :return: dict describing identical results
+        :rtype: dict
+        """
+        keys = sorted(d.keys())
+        # use the first one as "expected" to compare the others against
+        expected = d[keys[0]]
+        err = ''
+        # iterate each result; it's an error if either it failed, or it doesn't
+        # match the expected value
+        for k in keys:
+            if d[k].get('failed', True) is True:
+                err += "Key %s failed with %s %s: \n%s\n" % (
+                    k, d[k].get('exc_type', ''), d[k].get('exc_str', ''),
+                    d[k].get('traceback', ''))
+            if d[k] != expected:
+                err += "Key %s does not match expected:\n%s\n" % (
+                    k, dictdiff(d[k], expected))
+        # AssertionError on any error conditions, but we want to show ALL
+        assert err == '', err
+        # else return the indentical dict for all of them
+        return expected
+
+    def _git_checkout(self, path, ref):
+        cmd = ['git', 'checkout', '-f', ref]
+        print_header("_git_checkout() running: '%s' in: %s" % (
+            ' '.join(cmd), path))
+        with chdir(path):
+            output = _check_output(cmd, stderr=subprocess.STDOUT)
+            print(output)
+        print_header('DONE')
+
+    def _git_clone_test(self, ref=None):
+        """
+        Clone TEST_GIT_HTTPS_URL to a local temporary directory; checkout
+        the specified ref.
+
+        :return: path to git clone
+        :rtype: str
+        """
+        d = mkdtemp(prefix='pytest-versionfinder')
+        print_header('_git_clone_test(%s) cloning %s into %s' % (
+            ref, TEST_GIT_HTTPS_URL, d))
+        output = _check_output(
+            ['git', 'clone', TEST_GIT_HTTPS_URL, d],
+            stderr=subprocess.STDOUT
+        )
+        print(output)
+        print_header('DONE')
+        if ref is not None:
+            self._git_checkout(d, ref)
+        return d
+
+    def _get_package(self, pkg_url):
+        """
+        Download the package from ``pkg_url`` to a tempdir.
+
+        :param pkg_url: url of the package to download
+        :type pkg_url: str
+        :return: path to the package on disk
+        :rtype: str
+        """
+        fname = pkg_url.split('/')[-1]
+        d = mkdtemp(prefix='pytest-versionfinder')
+        p = os.path.join(d, fname)
+        r = requests.get(pkg_url, stream=True)
+        assert r.status_code == 200
+        with open(p, 'wb') as fh:
+            for chunk in r:
+                fh.write(chunk)
+        return p
+
+
 @pytest.mark.acceptance
-class DONOTTestTest(object):
+class DONOTTestTest(AcceptanceHelpers):
 
     def test_passing(self, capsys, tmpdir):
         print("foo print")
@@ -152,7 +446,7 @@ class DONOTTestTest(object):
 
 
 @pytest.mark.acceptance
-class TestAcceptance(object):
+class TestAcceptance(AcceptanceHelpers):
     """
     Long-running acceptance tests for VersionFinder.
 
@@ -211,7 +505,7 @@ class TestAcceptance(object):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -263,9 +557,9 @@ class TestAcceptance(object):
         expected = {
             'failed': False,
             'result': {
-                'git_commit': TEST_MASTER_COMMIT,
+                'git_commit': commit,
                 'git_tag': 'versioncheck',
-                'git_origin': None,
+                'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
@@ -785,301 +1079,6 @@ class TestAcceptance(object):
             }
         }
         assert sorted(actual) == sorted(expected)
-
-    ##################
-    # HELPER METHODS #
-    ##################
-
-    def setup_method(self, method):
-        os.environ['VERSIONCHECK_DEBUG'] = 'true'
-        print("\n")
-        self._set_git_config()
-        self.current_venv_path = sys.prefix
-        self.source_dir = self._get_source_dir()
-        self.test_tarball = self._get_package(TEST_TARBALL)
-        self.test_wheel = self._get_package(TEST_WHEEL)
-
-    def _get_source_dir(self):
-        """
-        Determine the directory containing the project source. This is assumed
-        to be either the TOXINIDIR environment variable, or determined relative
-        to this file.
-
-        :returns: path to the awslimitchecker source
-        :rtype: str
-        """
-
-        s = os.environ.get('TOXINIDIR', None)
-        if s is None:
-            s = os.path.abspath(
-                os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)),
-                    '..',
-                    '..'
-                )
-            )
-        assert os.path.exists(s)
-        return s
-
-    def _git_add_remote(self, path, rmt_name, rmt_url):
-        """
-        Add a git remote to the repo at path
-
-        :param path: path to the git repo
-        :type path: str
-        :param rmt_name: name for the remote
-        :type rmt_name: str
-        :param rmt_url: URL for the remote
-        :type rmt_url: str
-        """
-        args = [
-            'git',
-            'remote',
-            'add',
-            rmt_name,
-            rmt_url
-        ]
-        with chdir(path):
-            res = _check_output(args)
-            print(res)
-
-    def _set_git_config(self, set_in_travis=False):
-        if not set_in_travis and os.environ.get('TRAVIS', '') != 'true':
-            print("not running in Travis; not setting git config")
-            return
-        try:
-            res = _check_output([
-                'git',
-                'config',
-                'user.email'
-            ]).strip()
-        except subprocess.CalledProcessError as ex:
-            res = None
-        if res != '' and res is not None:
-            print("Got git config user.email as %s" % res)
-        else:
-            res = _check_output([
-                'git',
-                'config',
-                'user.email',
-                'travisci@jasonantman.com'
-            ])
-            print("Set git config user.email:\n%s" % res)
-        # name
-        try:
-            res = _check_output([
-                'git',
-                'config',
-                'user.name'
-            ]).strip()
-        except subprocess.CalledProcessError as ex:
-            print(ex)
-            res = None
-        if res != '' and res is not None:
-            print("Got git config user.name as %s" % res)
-        else:
-            res = _check_output([
-                'git',
-                'config',
-                'user.name',
-                'travisci'
-            ])
-            print("Set git config user.name:\n%s" % res)
-
-    def _set_git_tag(self, path, tagname):
-        """set a git tag for the current commit"""
-        with chdir(path):
-            tag = _get_git_tag(self.git_commit)
-            if tag != tagname:
-                print("Creating git tag 'versiontest' of %s" % self.git_commit)
-                res = _check_output([
-                    'git',
-                    'tag',
-                    '-a',
-                    '-m',
-                    tagname,
-                    tagname
-                ])
-                print(res)
-                tag = _get_git_tag(self.git_commit)
-            print("Source git tag: %s" % tag)
-        return tag
-
-    def _git_add_commit(self, path, commit_msg):
-        """
-        git add -A and git commit -m commit_msg in ``path``.
-        """
-        print_header('_git_add_commit(%s, %s)' % (path, commit_msg))
-        with chdir(path):
-            out = _check_output([
-                'git',
-                'add',
-                '-A'
-            ])
-            print(out)
-            out = _check_output([
-                'git',
-                'commit',
-                '-m',
-                '"%s"' % commit_msg
-            ])
-            print(out)
-            out = _check_output([
-                'git',
-                'rev-parse',
-                'HEAD'
-            ]).strip()
-        return out
-
-    def _make_venv(self, path):
-        """
-        Create a venv in ``path``. Make sure it exists.
-
-        :param path: filesystem path to directory to make the venv base
-        """
-        virtualenv = os.path.join(self.current_venv_path, 'bin', 'virtualenv')
-        assert os.path.exists(virtualenv) is True, 'virtualenv not found'
-        args = [virtualenv, path]
-        print_header(" _make_venv() running: " + ' '.join(args))
-        try:
-            res = _check_output(args, stderr=subprocess.STDOUT)
-            print(res)
-            print_header("DONE")
-        except subprocess.CalledProcessError:
-            print_header('FAILED')
-        pypath = os.path.join(path, 'bin', 'python')
-        assert os.path.exists(pypath) is True, "does not exist: %s" % pypath
-        # install our source in the venv
-        self._pip_install(path, [self.source_dir])
-
-    def _pip_install(self, path, args):
-        """
-        In the virtualenv at ``path``, run ``pip install [args]``.
-
-        :param path: venv base/root path
-        :param args: ``pip install`` arguments
-        """
-        pip = os.path.join(path, 'bin', 'pip')
-        # get pip version
-        res = _check_output([pip, '--version']).strip()
-        # install ALC in it
-        final_args = [pip, 'install']
-        final_args.extend(args)
-        print_header("_pip_install() running: " + ' '.join(final_args))
-        _check_output(final_args)
-        print_header('DONE')
-
-    def _make_git_repo(self, path):
-        """create a git repo under path; return the commit"""
-        print_header("creating git repository in %s" % path)
-        with chdir(path):
-            _check_output(['git', 'init', '.'])
-            with open('foo', 'w') as fh:
-                fh.write('foo')
-            _check_output(['git', 'add', 'foo'])
-            self._set_git_config(set_in_travis=True)
-            _check_output(['git', 'commit', '-m', 'foo'])
-            commit = _get_git_commit()
-            print_header("git repository in %s commit: %s" % (path, commit))
-        return commit
-
-    def _get_version(self, path):
-        """
-        In the virtualenv at ``path``, run ``versionfinder-test`` and
-        return the JSON-decoded output dict.
-
-        :param path: venv base/root path
-        :type path: str
-        :return: versionfinder-test command output
-        :rtype: dict
-        """
-        args = [os.path.join(path, 'bin', 'versionfinder-test')]
-        print_header("_get_version() running: " + ' '.join(args))
-        res = _check_output(args)
-        print(res)
-        print('DONE')
-        j = json.loads(res.strip())
-        return strip_unicode(j)
-
-    def _get_result(self, d):
-        """
-        Given the raw (JSON-decoded) result dict from :py:meth:`~._get_version`,
-        iterate through all of the keys. Assert that their values are all
-        identical, and don't contain exceptions. Return the identical result
-        dict.
-
-        :param d: result dict from :py:meth:`~._get_version`
-        :type d: dict
-        :return: dict describing identical results
-        :rtype: dict
-        """
-        keys = sorted(d.keys())
-        # use the first one as "expected" to compare the others against
-        expected = d[keys[0]]
-        err = ''
-        # iterate each result; it's an error if either it failed, or it doesn't
-        # match the expected value
-        for k in keys:
-            if d[k].get('failed', True) is True:
-                err += "Key %s failed with %s %s: \n%s\n" % (
-                    k, d[k].get('exc_type', ''), d[k].get('exc_str', ''),
-                    d[k].get('traceback', ''))
-            if d[k] != expected:
-                err += "Key %s does not match expected:\n%s\n" % (
-                    k, dictdiff(d[k], expected))
-        # AssertionError on any error conditions, but we want to show ALL
-        assert err == '', err
-        # else return the indentical dict for all of them
-        return expected
-
-    def _git_checkout(self, path, ref):
-        cmd = ['git', 'checkout', '-f', ref]
-        print_header("_git_checkout() running: '%s' in: %s" % (
-            ' '.join(cmd), path))
-        with chdir(path):
-            output = _check_output(cmd, stderr=subprocess.STDOUT)
-            print(output)
-        print_header('DONE')
-
-    def _git_clone_test(self, ref=None):
-        """
-        Clone TEST_GIT_HTTPS_URL to a local temporary directory; checkout
-        the specified ref.
-
-        :return: path to git clone
-        :rtype: str
-        """
-        d = mkdtemp(prefix='pytest-versionfinder')
-        print_header('_git_clone_test(%s) cloning %s into %s' % (
-            ref, TEST_GIT_HTTPS_URL, d))
-        output = _check_output(
-            ['git', 'clone', TEST_GIT_HTTPS_URL, d],
-            stderr=subprocess.STDOUT
-        )
-        print(output)
-        print_header('DONE')
-        if ref is not None:
-            self._git_checkout(d, ref)
-        return d
-
-    def _get_package(self, pkg_url):
-        """
-        Download the package from ``pkg_url`` to a tempdir.
-
-        :param pkg_url: url of the package to download
-        :type pkg_url: str
-        :return: path to the package on disk
-        :rtype: str
-        """
-        fname = pkg_url.split('/')[-1]
-        d = mkdtemp(prefix='pytest-versionfinder')
-        p = os.path.join(d, fname)
-        r = requests.get(pkg_url, stream=True)
-        assert r.status_code == 200
-        with open(p, 'wb') as fh:
-            for chunk in r:
-                fh.write(chunk)
-        return p
 
 
 def dictdiff(actual, expected, prefix=None):
