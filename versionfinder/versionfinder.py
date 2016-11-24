@@ -92,8 +92,10 @@ class VersionFinder(object):
             pip_log = logging.getLogger("pip")
             pip_log.setLevel(logging.CRITICAL)
             pip_log.propagate = True
+        logger.debug("Finding package version for: %s", package_name)
         self.package_name = package_name
         if package_file is not None:
+            logger.debug("Explicit package file: %s", package_file)
             self.package_file = package_file
         else:
             frame = inspect.stack()[1][0]
