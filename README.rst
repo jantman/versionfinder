@@ -100,6 +100,17 @@ Testing is done via `pytest <http://pytest.org/latest/>`_, driven by `tox <http:
 
 * If you want to pass additional arguments to pytest, add them to the tox command line after "--". i.e., for verbose pytext output on py27 tests: ``tox -e py27 -- -v``
 
+Acceptance Tests
+----------------
+
+Versionfinder has a suite of acceptance tests that create virtualenvs, install a
+test package (`versionfinder-test-pkg <https://github.com/jantman/versionfinder-test-pkg>`_) in them,
+and then call ``versionfinder.find_version()`` from multiple locations in the package, printing a JSON-serialized
+dict of the results of each call (and an exception, if one was caught). For further information
+on the acceptance tests, see ``versionfinder/tests/test_acceptance.py``.
+
+
+
 Release Checklist
 -----------------
 
