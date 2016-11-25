@@ -68,7 +68,8 @@ logger = logging.getLogger(__name__)
 
 class VersionFinder(object):
 
-    def __init__(self, package_name, package_file=None, log=False):
+    def __init__(self, package_name, package_file=None, log=False,
+                 caller_frame=None):
         """
         Initialize a VersionFinder to find version information of the named
         package, which includes a given file. ``package_file`` must be a Python
@@ -86,6 +87,10 @@ class VersionFinder(object):
           package to find information about; if not specified, the file calling
           this class will be used
         :type package_file: str
+        :param caller_frame: If the call to this method is wrapped by something else,
+          this should be the stack frame representing the original caller. Not
+          used if ``package_file`` is specified.
+        :type caller_frame: frame
         """
         if not log:
             logger.setLevel(logging.CRITICAL)
@@ -98,12 +103,15 @@ class VersionFinder(object):
             logger.debug("Explicit package file: %s", package_file)
             self.package_file = package_file
         else:
-            frame = inspect.stack()[1][0]
+            if caller_frame is None:
+                caller_frame = inspect.stack()[1][0]
             self.package_file = os.path.abspath(
-                inspect.getframeinfo(frame).filename)
+                inspect.getframeinfo(caller_frame).filename)
             logger.debug("Found package_file as: %s", self.package_file)
         self.package_dir = os.path.dirname(self.package_file)
         logger.debug('package_dir: %s' % self.package_dir)
+        self.pip_locations = None
+        self.pkg_resources_locations = None
 
     def find_package_version(self):
         """
@@ -137,19 +145,6 @@ class VersionFinder(object):
             'git_origin': None,
             'git_is_dirty': None
         }
-        if self._is_git_clone:
-            git_info = self._find_git_info()
-            logger.debug("Git info: %s", git_info)
-            for k, v in git_info.items():
-                if k == 'dirty':
-                    res['git_is_dirty'] = v
-                    continue
-                if k == 'url':
-                    res['git_origin'] = v
-                if v is not None:
-                    res[k] = v
-        else:
-            logger.debug("Install does not appear to be a git clone")
         try:
             pip_info = self._find_pip_info()
         except Exception:
@@ -157,10 +152,9 @@ class VersionFinder(object):
             logger.debug('Caught exception running _find_pip_info()')
             pip_info = {}
         logger.debug("pip info: %s", pip_info)
-        if 'version' in pip_info:
-            res['version'] = pip_info['version']
-        if 'url' in pip_info and res['url'] is None:
-            res['url'] = pip_info['url']
+        for k, v in pip_info.items():
+            if v is not None:
+                res[k] = v
         try:
             pkg_info = self._find_pkg_info()
         except Exception:
@@ -171,6 +165,20 @@ class VersionFinder(object):
             res['version'] = pkg_info['version']
         if 'url' in pkg_info and res['url'] is None:
             res['url'] = pkg_info['url']
+        if self._is_git_clone:
+            git_info = self._find_git_info()
+            logger.debug("Git info: %s", git_info)
+            for k, v in git_info.items():
+                if k == 'dirty':
+                    res['git_is_dirty'] = v
+                elif k == 'commit':
+                    res['git_commit'] = v
+                elif k == 'url':
+                    res['git_origin'] = v
+                elif v is not None:
+                    res[k] = v
+        else:
+            logger.debug("Install does not appear to be a git clone")
         logger.debug("Final package info: %s", res)
         return res
 
@@ -182,6 +190,9 @@ class VersionFinder(object):
         :rtype: bool
         :returns: True if installed via git, False otherwise
         """
+        # this is why test_install_local_e is failing - the git clone is
+        # one directory above where we're looking
+        logger.debug('Checking for git directory in: %s', self._package_top_dir)
         for p in self._package_top_dir:
             if os.path.exists(os.path.join(p, '.git')):
                 logger.debug('_is_git_clone() true based on %s/.git' % p)
@@ -191,41 +202,43 @@ class VersionFinder(object):
 
     def _find_pkg_info(self):
         """
-        Find information about the installed versionfinder from pkg_resources.
+        Find information about the installed package from pkg_resources.
 
-        :returns: information from pkg_resources about 'versionfinder'
+        :returns: information from pkg_resources about ``self.package_name``
         :rtype: dict
         """
         dist = pkg_resources.require(self.package_name)[0]
+        self.pkg_resources_locations = [dist.location]
         ver, url = self._dist_version_url(dist)
         return {'version': ver, 'url': url}
 
     def _find_pip_info(self):
         """
-        Try to find information about the installed versionfinder from pip.
+        Try to find information about the installed package from pip.
         This should be wrapped in a try/except.
 
-        :returns: information from pip about 'versionfinder'
+        :returns: information from pip about ``self.package_name``.
         :rtype: dict
         """
         res = {}
         dist = None
+        dist_name = self.package_name.replace('_', '-')
+        logger.debug('Checking for pip distribution named: %s', dist_name)
         for d in pip.get_installed_distributions():
-            if d.project_name == self.package_name:
+            if d.project_name == dist_name:
                 dist = d
         if dist is None:
             logger.debug('could not find dist matching package_name')
             return res
         logger.debug('found dist: %s', dist)
+        self.pip_locations = [dist.location]
         ver, url = self._dist_version_url(dist)
         res['version'] = ver
+        res['url'] = url
         # this is a bit of an ugly, lazy hack...
         req = pip.FrozenRequirement.from_dist(dist, [])
         logger.debug('pip FrozenRequirement: %s', req)
-        if ':' in req.req or '@' in req.req:
-            res['url'] = req.req
-        else:
-            res['url'] = url
+        res['pip_requirement'] = req.req
         return res
 
     def _dist_version_url(self, dist):
@@ -298,7 +311,14 @@ class VersionFinder(object):
         :return: list of possible package top-level directories (absolute paths)
         :rtype: list
         """
-        return [self.package_dir]
+        r = [self.package_dir]
+        for l in self.pip_locations:
+            if l is not None:
+                r.append(l)
+        for l in self.pkg_resources_locations:
+            if l is not None:
+                r.append(l)
+        return list(set(r))
 
 def _check_output(args, stderr=None):
     """
@@ -333,7 +353,6 @@ def _get_git_commit():
         commit = _check_output([
             'git',
             'rev-parse',
-            '--short',
             'HEAD'
         ], stderr=DEVNULL).strip()
         logger.debug("Found source git commit: %s", commit)
