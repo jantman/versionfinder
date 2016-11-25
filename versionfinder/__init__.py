@@ -45,6 +45,20 @@ def find_version(*args, **kwargs):
     :py:meth:`~.VersionFinder.find_package_version` method. Pass arguments and
     kwargs to VersionFinder constructor, return the value of its
     ``find_package_version`` method.
+
+    :param package_name: name of the package to find information about
+    :type package_name: str
+    :param package_file: absolute path to a Python source file in the
+      package to find information about; if not specified, the file calling
+      this class will be used
+    :type package_file: str
+    :param log: If not set to True, the "versionfinder" and "pip" loggers
+      will be set to a level of :py:const:`logging.CRITICAL` to suppress
+      log output. If set to True, you will see a LOT of debug-level log
+      output, for debugging the internals of versionfinder.
+    :type log: bool
+    :returns: information about the installed version of the package
+    :rtype: :py:class:`~versionfinder.versioninfo.VersionInfo`
     """
     if 'caller_frame' not in kwargs:
         kwargs['caller_frame'] = inspect.stack()[1][0]

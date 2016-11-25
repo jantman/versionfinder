@@ -5,7 +5,7 @@ The latest version of this package is available at:
 <https://github.com/jantman/versionfinder>
 
 ################################################################################
-Copyright 2015 Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
+Copyright 2016 Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 
     This file is part of versionfinder.
 
@@ -45,6 +45,8 @@ import sys
 import locale
 import inspect
 from contextlib import contextmanager
+
+from versionfinder.versioninfo import VersionInfo
 
 if sys.version_info >= (3, 3):
     from subprocess import DEVNULL
@@ -87,9 +89,15 @@ class VersionFinder(object):
           package to find information about; if not specified, the file calling
           this class will be used
         :type package_file: str
-        :param caller_frame: If the call to this method is wrapped by something else,
-          this should be the stack frame representing the original caller. Not
-          used if ``package_file`` is specified.
+        :param log: If not set to True, the "versionfinder" and "pip" loggers
+          will be set to a level of :py:const:`logging.CRITICAL` to suppress
+          log output. If set to True, you will see a LOT of debug-level log
+          output, for debugging the internals of versionfinder.
+        :type log: bool
+        :param caller_frame: If the call to this method is wrapped by something
+          else, this should be the stack frame representing the original caller.
+          Not used if ``package_file`` is specified. See
+          :py:func:`versionfinder.find_version` for an example.
         :type caller_frame: frame
         """
         if not log:
@@ -135,14 +143,17 @@ class VersionFinder(object):
         :param package_name: name of the package to find information for
         :type package_name: str
         :returns: information about the installed version of the package
-        :rtype: dict
+        :rtype: :py:class:`~versionfinder.versioninfo.VersionInfo`
         """
         res = {
-            'version': None,
-            'url': None,
+            'pip_version': None,
+            'pip_url': None,
+            'pip_requirement': None,
+            'pkg_resources_version': None,
+            'pkg_resources_url': None,
             'git_tag': None,
             'git_commit': None,
-            'git_origin': None,
+            'git_remotes': None,
             'git_is_dirty': None
         }
         try:
@@ -154,17 +165,15 @@ class VersionFinder(object):
         logger.debug("pip info: %s", pip_info)
         for k, v in pip_info.items():
             if v is not None:
-                res[k] = v
+                res['pip_' + k] = v
         try:
             pkg_info = self._find_pkg_info()
         except Exception:
             logger.debug('Caught exception running _find_pkg_info()')
             pkg_info = {}
         logger.debug("pkg_resources info: %s", pkg_info)
-        if 'version' in pkg_info and res['version'] is None:
-            res['version'] = pkg_info['version']
-        if 'url' in pkg_info and res['url'] is None:
-            res['url'] = pkg_info['url']
+        for k, v in pkg_info.items():
+            res['pkg_resources_' + k] = v
         if self._is_git_clone:
             git_info = self._find_git_info()
             logger.debug("Git info: %s", git_info)
@@ -173,14 +182,14 @@ class VersionFinder(object):
                     res['git_is_dirty'] = v
                 elif k == 'commit':
                     res['git_commit'] = v
-                elif k == 'url':
-                    res['git_origin'] = v
-                elif v is not None:
-                    res[k] = v
+                elif k == 'remotes':
+                    res['git_remotes'] = v
+                elif k == 'tag':
+                    res['git_tag'] = v
         else:
             logger.debug("Install does not appear to be a git clone")
         logger.debug("Final package info: %s", res)
-        return res
+        return VersionInfo(**res)
 
     @property
     def _is_git_clone(self):
@@ -238,7 +247,7 @@ class VersionFinder(object):
         # this is a bit of an ugly, lazy hack...
         req = pip.FrozenRequirement.from_dist(dist, [])
         logger.debug('pip FrozenRequirement: %s', req)
-        res['pip_requirement'] = req.req
+        res['requirement'] = req.req
         return res
 
     def _dist_version_url(self, dist):
@@ -267,13 +276,13 @@ class VersionFinder(object):
         :returns: information about the git clone
         :rtype: dict
         """
-        res = {'url': None, 'tag': None, 'commit': None, 'dirty': None}
+        res = {'remotes': None, 'tag': None, 'commit': None, 'dirty': None}
         newdir = os.path.dirname(os.path.abspath(self.package_dir))
         with chdir(newdir):
             res['commit'] = _get_git_commit()
             if res['commit'] is not None:
                 res['tag'] = _get_git_tag(res['commit'])
-                res['url'] = _get_git_url()
+                res['remotes'] = _get_git_remotes()
             try:
                 res['dirty'] = self._is_git_dirty()
             except Exception:
@@ -390,15 +399,16 @@ def _get_git_tag(commit):
     return tag
 
 
-def _get_git_url():
+def _get_git_remotes():
     """
-    Get the origin URL for the git repository.
+    Get a dict of name => value pairs for all git remotes configured on the
+    repository.
 
-    :returns: repository origin URL
-    :rtype: string
+    :returns: git remotes, name => value
+    :rtype: dict
     """
+    urls = {}
     try:
-        url = None
         lines = _check_output([
             'git',
             'remote',
@@ -406,23 +416,16 @@ def _get_git_url():
         ], stderr=DEVNULL).strip()
         logger.debug('git remotes: %s' % lines)
         lines = lines.split("\n")
-        urls = {}
         for line in lines:
             parts = re.split(r'\s+', line)
             if parts[2] != '(fetch)':
                 continue
             urls[parts[0]] = parts[1]
-        if 'origin' in urls:
-            return urls['origin']
-        for k, v in sorted(urls.items()):
-            return v
     except subprocess.CalledProcessError:
         logger.debug('CalledProcessError listing git remotes')
-        url = None
     except IndexError:
         logger.debug('IndexError getting git remotes', exc_info=True)
-        url = None
-    return url
+    return urls
 
 
 @contextmanager
