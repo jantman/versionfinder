@@ -112,6 +112,7 @@ on the acceptance tests, see ``versionfinder/tests/test_acceptance.py``.
 Currently-tested scenarios are:
 
 * Pip
+
   * Install from local git clone
   * Install editable from local git clone
   * Install editable from local git clone then change a file (dirty)
@@ -134,7 +135,9 @@ Currently-tested scenarios are:
   * Install editable from git URL with branch
   * Install sdist in a venv that's also a git repo
   * Install wheel in a venv that's also a git repo
+
 * setuptools / setup.py
+
   * setup.py develop
   * setup.py install
 

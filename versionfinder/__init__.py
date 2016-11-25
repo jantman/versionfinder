@@ -53,7 +53,7 @@ def find_version(*args, **kwargs):
       this class will be used
     :type package_file: str
     :param log: If not set to True, the "versionfinder" and "pip" loggers
-      will be set to a level of :py:const:`logging.CRITICAL` to suppress
+      will be set to a level of ``logging.CRITICAL`` to suppress
       log output. If set to True, you will see a LOT of debug-level log
       output, for debugging the internals of versionfinder.
     :type log: bool

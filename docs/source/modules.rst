@@ -1,5 +1,5 @@
 versionfinder
-===============
+=============
 
 .. toctree::
    :maxdepth: 4
