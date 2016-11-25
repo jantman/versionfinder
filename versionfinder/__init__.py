@@ -35,6 +35,7 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ##################################################################################
 """
 
+import inspect
 from versionfinder import VersionFinder
 
 
@@ -45,4 +46,6 @@ def find_version(*args, **kwargs):
     kwargs to VersionFinder constructor, return the value of its
     ``find_package_version`` method.
     """
+    if 'caller_frame' not in kwargs:
+        kwargs['caller_frame'] = inspect.stack()[1][0]
     return VersionFinder(*args, **kwargs).find_package_version()
