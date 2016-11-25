@@ -141,11 +141,12 @@ Currently-tested scenarios are:
 @TODO:
 
 - install from a fork (pip git editable; with and without upstream remote)
-- pip install egg
+- pip install egg; egg with venv in git repo
 - easy_install https://setuptools.readthedocs.io/en/latest/easy_install.html
   - tarball
   - egg
   - source directory
+  - each of those with the venv in a git repo
 
 Release Checklist
 -----------------
