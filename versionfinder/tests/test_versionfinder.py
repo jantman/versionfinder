@@ -46,7 +46,7 @@ from pip._vendor.packaging.version import Version
 
 import versionfinder.versionfinder
 from versionfinder.versionfinder import (
-    _get_git_commit, _get_git_url, _get_git_tag, _check_output, DEVNULL,
+    _get_git_commit, _get_git_remotes, _get_git_tag, _check_output, DEVNULL,
     VersionFinder
 )
 
