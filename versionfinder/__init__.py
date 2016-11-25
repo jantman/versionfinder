@@ -36,7 +36,7 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 """
 
 import inspect
-from versionfinder import VersionFinder
+from .versionfinder import VersionFinder
 
 
 def find_version(*args, **kwargs):
