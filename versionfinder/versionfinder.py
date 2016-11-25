@@ -46,7 +46,7 @@ import locale
 import inspect
 from contextlib import contextmanager
 
-from versionfinder.versioninfo import VersionInfo
+from .versioninfo import VersionInfo
 
 if sys.version_info >= (3, 3):
     from subprocess import DEVNULL
