@@ -217,6 +217,7 @@ class AcceptanceHelpers(object):
     def _set_git_tag(self, path, tagname):
         """set a git tag for the current commit"""
         with chdir(path):
+            self._set_git_config()
             commit = _check_output([
                 'git',
                 'rev-parse',
@@ -241,6 +242,7 @@ class AcceptanceHelpers(object):
         """
         print_header('_git_add_commit(%s, %s)' % (path, commit_msg))
         with chdir(path):
+            self._set_git_config()
             out = _check_output([
                 'git',
                 'add',
@@ -304,6 +306,7 @@ class AcceptanceHelpers(object):
         print_header("creating git repository in %s" % path)
         with chdir(path):
             _check_output(['git', 'init', '.'])
+            self._set_git_config()
             with open('foo', 'w') as fh:
                 fh.write('foo')
             _check_output(['git', 'add', 'foo'])
