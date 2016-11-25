@@ -53,8 +53,9 @@ from tempfile import mkdtemp
 from contextlib import contextmanager
 
 from versionfinder.versionfinder import (
-    _get_git_commit, _get_git_url, _get_git_tag, _check_output, chdir
+    _get_git_commit, _check_output, chdir
 )
+from versionfinder.versioninfo import VersionInfo
 
 import logging
 logger = logging.getLogger(__name__)
@@ -63,12 +64,12 @@ TEST_PROJECT = 'versionfinder_test_pkg'
 TEST_GIT_HTTPS_URL = 'https://github.com/jantman/versionfinder-test-pkg.git'
 TEST_FORK_HTTPS_URL = 'https://github.com/sniknej/versionfinder-test-pkg.git'
 TEST_PROJECT_URL = 'https://github.com/jantman/versionfinder-test-pkg'
-TEST_VERSION = '0.2.4'
-TEST_TAG = '0.2.4'
-TEST_TAG_COMMIT = 'a72095ff7189ed4fe4d5d39c005a9014ee4a93d9'
-TEST_MASTER_COMMIT = 'aca2af99cc5cd7ba899a81ce50ec66d467778d13'
+TEST_VERSION = '0.2.5'
+TEST_TAG = '0.2.5'
+TEST_TAG_COMMIT = '212d9950ca546013b5539133d7862c2fa4bea6f3'
+TEST_MASTER_COMMIT = 'd3e34699fb7bf81c90ddd3e74c557a603aa22f98'
 TEST_BRANCH = 'testbranch'
-TEST_BRANCH_COMMIT = 'de452bfe6f04a2404c728a2799b2ce9f50f9da3d'
+TEST_BRANCH_COMMIT = 'a5f7fa6b3b7aa57aa2661633896ba61eb78bbc97'
 
 TEST_TARBALL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
                'download/{ver}/versionfinder_test_pkg-{ver}.tar' \
@@ -430,8 +431,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': None,
                 'git_is_dirty': None,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert actual == expected
@@ -452,8 +456,10 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
                 'pip_requirement': 'git+%s@%s#egg=%s' % (
                     TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT, TEST_PROJECT
                 )
@@ -481,8 +487,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': True,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -509,8 +518,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': 'versioncheck',
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -532,8 +544,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': TEST_TAG,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -555,8 +570,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': TEST_TAG,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -579,8 +597,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': 'https://github.com/jantman/awslimitchecker.git',
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -600,8 +621,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': None,
                 'git_is_dirty': None,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -623,8 +647,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': None,
                 'git_is_dirty': None,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -644,8 +671,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': None,
                 'git_is_dirty': None,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -669,8 +699,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -695,8 +728,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -721,8 +757,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': TEST_TAG,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -747,8 +786,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': TEST_BRANCH,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -773,8 +815,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -802,8 +847,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -835,8 +883,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': True,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -862,8 +913,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -889,8 +943,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': TEST_TAG,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -916,8 +973,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -939,8 +999,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': None,
                 'git_is_dirty': None,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -962,8 +1025,11 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': None,
                 'git_is_dirty': None,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -995,8 +1061,11 @@ class TestSetupPy(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': TEST_GIT_HTTPS_URL,
                 'git_is_dirty': False,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
@@ -1025,8 +1094,11 @@ class TestSetupPy(AcceptanceHelpers):
                 'git_tag': None,
                 'git_origin': None,
                 'git_is_dirty': None,
-                'version': TEST_VERSION,
-                'url': TEST_PROJECT_URL,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
         assert sorted(actual) == sorted(expected)
