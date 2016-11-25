@@ -247,7 +247,7 @@ class VersionFinder(object):
         # this is a bit of an ugly, lazy hack...
         req = pip.FrozenRequirement.from_dist(dist, [])
         logger.debug('pip FrozenRequirement: %s', req)
-        res['requirement'] = req.req
+        res['requirement'] = str(req.req)
         return res
 
     def _dist_version_url(self, dist):

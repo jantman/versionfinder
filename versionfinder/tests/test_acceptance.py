@@ -429,11 +429,11 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_remotes': None,
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==0.2.5',
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -454,7 +454,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -485,7 +487,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': True,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -516,7 +520,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': commit,
                 'git_tag': 'versioncheck',
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -542,7 +548,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_TAG_COMMIT,
                 'git_tag': TEST_TAG,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -568,7 +576,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_TAG_COMMIT,
                 'git_tag': TEST_TAG,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -619,7 +629,7 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_remotes': None,
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -645,7 +655,7 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_remotes': None,
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -669,7 +679,7 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_remotes': None,
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -697,7 +707,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -726,7 +738,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -755,7 +769,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': TEST_TAG,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -784,7 +800,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': TEST_BRANCH,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -813,7 +831,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -845,7 +865,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -881,7 +903,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': True,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -911,7 +935,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -941,7 +967,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_TAG_COMMIT,
                 'git_tag': TEST_TAG,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -971,7 +999,9 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_BRANCH_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -997,7 +1027,7 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_remotes': None,
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -1023,7 +1053,7 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_remotes': None,
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -1059,7 +1089,9 @@ class TestSetupPy(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': TEST_GIT_HTTPS_URL,
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
@@ -1092,7 +1124,7 @@ class TestSetupPy(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_origin': None,
+                'git_remotes': None,
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
