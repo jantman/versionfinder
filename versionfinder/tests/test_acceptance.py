@@ -1165,7 +1165,7 @@ def print_header(s):
 
 def strip_unicode(d):
     n = {}
-    for k, v in d.iteritems():
+    for k, v in d.items():
         if isinstance(v, type({})):
             n[str(k)] = strip_unicode(v)
         elif v is True or v is False or v is None:
