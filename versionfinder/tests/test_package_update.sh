@@ -79,6 +79,7 @@ echo "You must also update acceptance tests with:"
 cat <<EOF
 TEST_PROJECT = 'versionfinder_test_pkg'
 TEST_GIT_HTTPS_URL = 'https://github.com/jantman/versionfinder-test-pkg.git'
+TEST_FORK_HTTPS_URL = 'https://github.com/sniknej/versionfinder-test-pkg.git'
 TEST_PROJECT_URL = 'https://github.com/jantman/versionfinder-test-pkg'
 TEST_VERSION = '${newver}'
 TEST_TAG = '${newver}'
