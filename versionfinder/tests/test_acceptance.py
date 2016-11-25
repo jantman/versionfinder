@@ -467,6 +467,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'version': TEST_VERSION,
                 'url': TEST_PROJECT_URL,
+                'pip_requirement': 'git+%s@%s#egg=%s' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT, TEST_PROJECT
+                )
             }
         }
         assert actual == expected
