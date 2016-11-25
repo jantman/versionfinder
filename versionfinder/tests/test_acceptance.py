@@ -42,19 +42,6 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
-"""
-@TODO:
-
-Install methods should include:
-- install from a fork (pip git editable; with and without upstream remote)
-- pip install egg
-- conda? http://conda.pydata.org/docs/intro.html
-- easy_install https://setuptools.readthedocs.io/en/latest/easy_install.html
-  - tarball
-  - egg
-  - source directory
-"""
-
 import pytest
 import sys
 import os

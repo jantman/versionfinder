@@ -109,7 +109,43 @@ and then call ``versionfinder.find_version()`` from multiple locations in the pa
 dict of the results of each call (and an exception, if one was caught). For further information
 on the acceptance tests, see ``versionfinder/tests/test_acceptance.py``.
 
+Currently-tested scenarios are:
 
+* Pip
+  * Install from local git clone
+  * Install editable from local git clone
+  * Install editable from local git clone then change a file (dirty)
+  * Install editable from local git clone then commit and tag
+  * Install editable from local git clone checked out to a tag
+  * Install editable from local git clone checked out to a commit
+  * Install editable from local git clone with multiple remotes
+  * Install from sdist
+  * Install from sdist with pip 1.5.4
+  * Install from wheel
+  * Install from git URL
+  * Install from git URL with commit
+  * Install from git URL with tag
+  * Install from git URL with branch
+  * Install editable from git URL
+  * Install editable from git URL with multiple remotes
+  * Install editable from git URL and then change a file in the clone (dirty)
+  * Install editable from git URL with commit
+  * Install editable from git URL with tag
+  * Install editable from git URL with branch
+  * Install sdist in a venv that's also a git repo
+  * Install wheel in a venv that's also a git repo
+* setuptools / setup.py
+  * setup.py develop
+  * setup.py install
+
+@TODO:
+
+- install from a fork (pip git editable; with and without upstream remote)
+- pip install egg
+- easy_install https://setuptools.readthedocs.io/en/latest/easy_install.html
+  - tarball
+  - egg
+  - source directory
 
 Release Checklist
 -----------------
