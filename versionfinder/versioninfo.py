@@ -108,6 +108,17 @@ class VersionInfo(object):
             'git_is_dirty': self._git_is_dirty,
         }
 
+    def __repr__(self):
+        """
+        Return a string representation of the object.
+
+        :return: representation of the object
+        :rtype: str
+        """
+        d = self.as_dict
+        p = ', '.join(['%s=%s' % (k, d[k]) for k in sorted(d.keys())])
+        return 'VersionInfo(%s)' % p
+
     def __eq__(self, other):
         """
 
