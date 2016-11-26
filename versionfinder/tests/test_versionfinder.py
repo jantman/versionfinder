@@ -678,7 +678,6 @@ class TestIsGitClone(BaseTest):
 class TestFindGitInfo(BaseTest):
 
     def test_find(self):
-        cls = VersionFinder()
         # this is a horribly ugly way to get this to work on py26-py34
         mocks = {}
         with patch.multiple(
@@ -704,7 +703,7 @@ class TestFindGitInfo(BaseTest):
                     mocks['_get_git_tag'].return_value = 'mytag'
                     mocks['_get_git_url'].return_value = 'http://my.git/url'
                     mocks['_is_git_dirty'].return_value = False
-                    res = cls._find_git_info()
+                    res = self.cls._find_git_info()
         assert mocks['_get_git_commit'].mock_calls == [call()]
         assert mocks['_get_git_tag'].mock_calls == [call('12345678')]
         assert mocks['_get_git_url'].mock_calls == [call()]
@@ -723,7 +722,6 @@ class TestFindGitInfo(BaseTest):
         }
 
     def test_no_git(self):
-        cls = VersionFinder()
 
         def se_exc():
             raise Exception("foo")
@@ -753,7 +751,7 @@ class TestFindGitInfo(BaseTest):
                     mocks['_get_git_tag'].return_value = 'mytag'
                     mocks['_get_git_url'].return_value = 'http://my.git/url'
                     mocks['_is_git_dirty'].side_effect = se_exc
-                    res = cls._find_git_info()
+                    res = self.cls._find_git_info()
         assert mocks['_get_git_commit'].mock_calls == [call()]
         assert mocks['_get_git_tag'].mock_calls == []
         assert mocks['_get_git_url'].mock_calls == []
@@ -807,8 +805,7 @@ class TestGetDistVersionUrl(BaseTest):
                 yield line
 
         dist.get_metadata_lines.side_effect = se_metadata
-        cls = VersionFinder()
-        res = cls._dist_version_url(dist)
+        res = self.cls._dist_version_url(dist)
         assert res == ('2.4.2',
                        'https://github.com/jantman/awslimitchecker')
 
@@ -845,8 +842,7 @@ class TestGetDistVersionUrl(BaseTest):
                 yield line
 
         dist.get_metadata_lines.side_effect = se_metadata
-        cls = VersionFinder()
-        res = cls._dist_version_url(dist)
+        res = self.cls._dist_version_url(dist)
         assert res == ('2.4.2',
                        'https://github.com/jantman/awslimitchecker')
 
@@ -880,15 +876,13 @@ class TestGetDistVersionUrl(BaseTest):
                 yield line
 
         dist.get_metadata_lines.side_effect = se_metadata
-        cls = VersionFinder()
-        res = cls._dist_version_url(dist)
+        res = self.cls._dist_version_url(dist)
         assert res == ('1.2.3', None)
 
 
 class TestFindPipInfo(BaseTest):
 
     def test_find(self):
-        cls = VersionFinder()
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
         mock_distB = Mock(autospec=True, project_name='other')
         mock_distC = Mock(autospec=True, project_name='another')
@@ -906,14 +900,13 @@ class TestFindPipInfo(BaseTest):
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
-                    res = cls._find_pip_info()
+                    res = self.cls._find_pip_info()
         assert res == {'version': '4.5.6', 'url': 'http://foo'}
         assert mock_pgid.mock_calls == [call()]
         assert mock_from_dist.mock_calls == [call(mock_distA, [])]
         assert mock_dist_vu.mock_calls == [call(mock_distA)]
 
     def test_no_dist(self):
-        cls = VersionFinder()
         mock_distB = Mock(autospec=True, project_name='other')
         mock_distC = Mock(autospec=True, project_name='another')
         installed_dists = [mock_distB, mock_distC]
@@ -930,7 +923,7 @@ class TestFindPipInfo(BaseTest):
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
-                    res = cls._find_pip_info()
+                    res = self.cls._find_pip_info()
         assert res == {}
         assert mock_pgid.mock_calls == [call()]
         assert mock_from_dist.mock_calls == []
@@ -939,7 +932,6 @@ class TestFindPipInfo(BaseTest):
     def test_req_https(self):
         req_str = 'git+https://github.com/jantman/awslimitchecker.git@76c7e51' \
                   'f6e83350c72a1d3e8122ee03e589bbfde#egg=awslimitchecker-master'
-        cls = VersionFinder()
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
         mock_distB = Mock(autospec=True, project_name='other')
         mock_distC = Mock(autospec=True, project_name='another')
@@ -957,7 +949,7 @@ class TestFindPipInfo(BaseTest):
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
-                    res = cls._find_pip_info()
+                    res = self.cls._find_pip_info()
         assert res == {'version': '4.5.6', 'url': req_str}
         assert mock_pgid.mock_calls == [call()]
         assert mock_from_dist.mock_calls == [call(mock_distA, [])]
@@ -966,7 +958,6 @@ class TestFindPipInfo(BaseTest):
     def test_req_git(self):
         req_str = 'git+git@github.com:jantman/awslimitchecker.git@76c7e51f6e8' \
                   '3350c72a1d3e8122ee03e589bbfde#egg=awslimitchecker-master'
-        cls = VersionFinder()
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
         mock_distB = Mock(autospec=True, project_name='other')
         mock_distC = Mock(autospec=True, project_name='another')
@@ -984,7 +975,7 @@ class TestFindPipInfo(BaseTest):
                     mock_pgid.return_value = installed_dists
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
-                    res = cls._find_pip_info()
+                    res = self.cls._find_pip_info()
         assert res == {'version': '4.5.6', 'url': req_str}
         assert mock_pgid.mock_calls == [call()]
         assert mock_from_dist.mock_calls == [call(mock_distA, [])]
@@ -994,13 +985,12 @@ class TestFindPipInfo(BaseTest):
 class TestFindPkgInfo(BaseTest):
 
     def test_find_pkg_info(self):
-        cls = VersionFinder()
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
         with patch('%s.pkg_resources.require' % pbm) as mock_require:
             with patch('%s._dist_version_url' % pb) as mock_dvu:
                 mock_require.return_value = [mock_distA]
                 mock_dvu.return_value = ('7.8.9', 'http://foobar')
-                res = cls._find_pkg_info()
+                res = self.cls._find_pkg_info()
         assert res == {'version': '7.8.9', 'url': 'http://foobar'}
 
 
@@ -1156,7 +1146,7 @@ class TestGetGitCommit(object):
             res = _get_git_commit()
         assert res == '1234abcd'
         assert mock_check_out.mock_calls == [
-            call(['git', 'rev-parse', '--short', 'HEAD'],
+            call(['git', 'rev-parse', 'HEAD'],
                  stderr=DEVNULL)
         ]
 
@@ -1170,7 +1160,7 @@ class TestGetGitCommit(object):
             res = _get_git_commit()
         assert res is None
         assert mock_check_out.mock_calls == [
-            call(['git', 'rev-parse', '--short', 'HEAD'],
+            call(['git', 'rev-parse', 'HEAD'],
                  stderr=DEVNULL)
         ]
 
