@@ -426,7 +426,7 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==0.2.5',
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -518,10 +518,12 @@ class TestPip(AcceptanceHelpers):
                 'git_remotes': {
                     'origin': TEST_GIT_HTTPS_URL,
                 },
-                'git_is_dirty': False,
+                'git_is_dirty': True,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, commit
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -549,7 +551,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_TAG_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -577,7 +581,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_TAG_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -600,11 +606,17 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': TEST_MASTER_COMMIT,
                 'git_tag': None,
-                'git_origin': 'https://github.com/jantman/awslimitchecker.git',
+                'git_remotes': {
+                    'origin': TEST_GIT_HTTPS_URL,
+                    'testremote': 'https://github.com/jantman/'
+                                  'awslimitchecker.git',
+                },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -628,7 +640,7 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -654,7 +666,7 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -678,7 +690,7 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -702,13 +714,11 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_remotes': {
-                    'origin': TEST_GIT_HTTPS_URL,
-                },
-                'git_is_dirty': False,
+                'git_remotes': None,
+                'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -732,13 +742,11 @@ class TestPip(AcceptanceHelpers):
             'result': {
                 'git_commit': None,
                 'git_tag': None,
-                'git_remotes': {
-                    'origin': TEST_FORK_HTTPS_URL,
-                },
-                'git_is_dirty': False,
+                'git_remotes': None,
+                'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -761,15 +769,13 @@ class TestPip(AcceptanceHelpers):
         expected = {
             'failed': False,
             'result': {
-                'git_commit': TEST_MASTER_COMMIT,
+                'git_commit': None,
                 'git_tag': None,
-                'git_remotes': {
-                    'origin': TEST_GIT_HTTPS_URL,
-                },
-                'git_is_dirty': False,
+                'git_remotes': None,
+                'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -793,14 +799,12 @@ class TestPip(AcceptanceHelpers):
             'failed': False,
             'result': {
                 'git_commit': None,
-                'git_tag': TEST_TAG,
-                'git_remotes': {
-                    'origin': TEST_GIT_HTTPS_URL,
-                },
-                'git_is_dirty': False,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -824,14 +828,12 @@ class TestPip(AcceptanceHelpers):
             'failed': False,
             'result': {
                 'git_commit': None,
-                'git_tag': TEST_BRANCH,
-                'git_remotes': {
-                    'origin': TEST_GIT_HTTPS_URL,
-                },
-                'git_is_dirty': False,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -862,7 +864,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -899,7 +903,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_FORK_HTTPS_URL, TEST_MASTER_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -920,7 +926,7 @@ class TestPip(AcceptanceHelpers):
         ])
         p = os.path.join(path, 'src', 'versionfinder-test-pkg')
         self._git_add_remote(p, 'testremote',
-                             'https://github.com/jantman/awslimitchecker.git')
+                             TEST_FORK_HTTPS_URL)
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -929,11 +935,14 @@ class TestPip(AcceptanceHelpers):
                 'git_tag': None,
                 'git_remotes': {
                     'origin': TEST_GIT_HTTPS_URL,
+                    'testremote': TEST_FORK_HTTPS_URL
                 },
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -971,7 +980,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': True,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1003,7 +1014,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1035,7 +1048,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_TAG_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1067,7 +1082,9 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_BRANCH_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1093,7 +1110,7 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1119,7 +1136,7 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1157,7 +1174,9 @@ class TestSetupPy(AcceptanceHelpers):
                 'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1190,7 +1209,7 @@ class TestSetupPy(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
