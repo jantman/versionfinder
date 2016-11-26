@@ -53,10 +53,7 @@ import backoff
 from tempfile import mkdtemp
 from contextlib import contextmanager
 
-from versionfinder.versionfinder import (
-    _get_git_commit, _check_output, chdir
-)
-from versionfinder.versioninfo import VersionInfo
+from versionfinder.versionfinder import (_get_git_commit, _check_output, chdir)
 
 import logging
 logger = logging.getLogger(__name__)
@@ -82,8 +79,7 @@ TEST_WHEEL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
 TEST_WHEEL_PATH = None  # set by setup_module()
 TEST_EGG_FMT = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
                'download/{ver}/versionfinder_test_pkg-{ver}-%s.egg'.format(
-    ver=TEST_VERSION
-)
+                   ver=TEST_VERSION)
 TEST_EGG_VERSIONS = ['py2.6', 'py2.7', 'py3.3', 'py3.4', 'py3.5']
 TEST_EGG_PATH = None
 
@@ -1172,6 +1168,7 @@ class TestPip(AcceptanceHelpers):
             }
         }
         assert actual == expected
+
 
 @pytest.mark.acceptance
 class TestSetupPy(AcceptanceHelpers):

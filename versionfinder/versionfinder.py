@@ -329,6 +329,7 @@ class VersionFinder(object):
                 r.append(l)
         return list(set(r))
 
+
 def _check_output(args, stderr=None):
     """
     Python version compatibility wrapper for subprocess.check_output

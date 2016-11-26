@@ -37,6 +37,7 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
+
 class VersionInfo(object):
     """
     Class describing :py:class:`~.VersionFinder` result; the discovered

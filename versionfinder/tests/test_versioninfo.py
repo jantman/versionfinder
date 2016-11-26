@@ -37,11 +37,10 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
-from versionfinder.versioninfo import VersionInfo
+# from versionfinder.versioninfo import VersionInfo
 
 
 class TestInit(object):
 
     def test_init(self):
         pass
-
