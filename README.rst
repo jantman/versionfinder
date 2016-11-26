@@ -120,7 +120,6 @@ Currently-tested scenarios are:
   * Install editable from local git clone checked out to a tag
   * Install editable from local git clone checked out to a commit
   * Install editable from local git clone with multiple remotes
-  * Install from egg
   * Install from sdist
   * Install from sdist with pip 1.5.4
   * Install from wheel
@@ -136,7 +135,6 @@ Currently-tested scenarios are:
   * Install editable from git URL with commit
   * Install editable from git URL with tag
   * Install editable from git URL with branch
-  * Install egg in a venv that's also a git repo
   * Install sdist in a venv that's also a git repo
   * Install wheel in a venv that's also a git repo
 

@@ -1103,59 +1103,6 @@ class TestPip(AcceptanceHelpers):
         }
         assert actual == expected
 
-    def test_install_egg(self, capsys, tmpdir):
-        if TEST_EGG_PATH is None:
-            pytest.skip("No egg for this python version")
-        path = str(tmpdir)
-        self._make_venv(path)
-        with capsys_disabled(capsys):
-            print("\n%s() venv=%s src=%s" % (
-                inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
-        self._pip_install(path, [TEST_EGG_PATH])
-        actual = self._get_result(self._get_version(path))
-        expected = {
-            'failed': False,
-            'result': {
-                'git_commit': None,
-                'git_tag': None,
-                'git_remotes': None,
-                'git_is_dirty': None,
-                'pip_version': TEST_VERSION,
-                'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
-                'pkg_resources_version': TEST_VERSION,
-                'pkg_resources_url': TEST_PROJECT_URL,
-            }
-        }
-        assert actual == expected
-
-    def test_install_egg_in_git_repo(self, capsys, tmpdir):
-        if TEST_EGG_PATH is None:
-            pytest.skip("No egg for this python version")
-        path = str(tmpdir)
-        self._make_venv(path)
-        self._make_git_repo(path)
-        with capsys_disabled(capsys):
-            print("\n%s() venv=%s src=%s" % (
-                inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
-        self._pip_install(path, [TEST_EGG_PATH])
-        actual = self._get_result(self._get_version(path))
-        expected = {
-            'failed': False,
-            'result': {
-                'git_commit': None,
-                'git_tag': None,
-                'git_remotes': None,
-                'git_is_dirty': None,
-                'pip_version': TEST_VERSION,
-                'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
-                'pkg_resources_version': TEST_VERSION,
-                'pkg_resources_url': TEST_PROJECT_URL,
-            }
-        }
-        assert actual == expected
-
     def test_install_sdist_in_git_repo(self, capsys, tmpdir):
         """regression test for issue #73"""
         path = str(tmpdir)
