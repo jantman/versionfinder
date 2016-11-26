@@ -80,12 +80,23 @@ TEST_WHEEL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
              'download/{ver}/versionfinder_test_pkg-{ver}-py2.py3-none-any' \
              '.whl'.format(ver=TEST_VERSION)
 TEST_WHEEL_PATH = None  # set by setup_module()
+TEST_EGG_FMT = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
+               'download/{ver}/versionfinder_test_pkg-{ver}-%s.egg'.format(
+    ver=TEST_VERSION
+)
+TEST_EGG_VERSIONS = ['py2.6', 'py2.7', 'py3.3', 'py3.4', 'py3.5']
+TEST_EGG_PATH = None
 
 
 def setup_module(module):
-    global TEST_TARBALL_PATH, TEST_WHEEL_PATH
+    global TEST_TARBALL_PATH, TEST_WHEEL_PATH, TEST_EGG_PATH
     TEST_TARBALL_PATH = get_package(TEST_TARBALL)
     TEST_WHEEL_PATH = get_package(TEST_WHEEL)
+    pyver = 'py%s.%s' % (sys.version_info[0], sys.version_info[1])
+    if pyver in TEST_EGG_VERSIONS:
+        TEST_EGG_PATH = get_package(TEST_EGG_FMT % pyver)
+    else:
+        print("'%s' not in TEST_EGG_VERSIONS" % pyver)
 
 
 @contextmanager
@@ -305,7 +316,8 @@ class AcceptanceHelpers(object):
         final_args = [pip, 'install']
         final_args.extend(args)
         print_header("_pip_install() running: " + ' '.join(final_args))
-        _check_output(final_args, stderr=subprocess.STDOUT)
+        res = _check_output(final_args, stderr=subprocess.STDOUT)
+        print(res)
         print_header('DONE')
 
     def _make_git_repo(self, path):
@@ -1085,6 +1097,59 @@ class TestPip(AcceptanceHelpers):
                 'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
                     TEST_GIT_HTTPS_URL, TEST_BRANCH_COMMIT
                 ),
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_egg(self, capsys, tmpdir):
+        if TEST_EGG_PATH is None:
+            pytest.skip("No egg for this python version")
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
+        self._pip_install(path, [TEST_EGG_PATH])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_egg_in_git_repo(self, capsys, tmpdir):
+        if TEST_EGG_PATH is None:
+            pytest.skip("No egg for this python version")
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._make_git_repo(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
+        self._pip_install(path, [TEST_EGG_PATH])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
