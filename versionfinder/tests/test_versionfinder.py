@@ -87,10 +87,14 @@ class TestInit(object):
     def test_init_no_file(self):
         m_frame = Mock()
         type(m_frame).filename = '/tmp/foo.py'
+        m_stack_frame = Mock()
         with patch('%s.inspect.stack' % pbm, autospec=True) as m_stack:
-            m_stack.return_value = [None, m_frame]
-            cls = VersionFinder('foobar')
+            with patch('%s.inspect.getframeinfo' % pbm) as m_get_frame:
+                m_stack.return_value = [None, [m_stack_frame]]
+                m_get_frame.return_value = m_frame
+                cls = VersionFinder('foobar')
         assert m_stack.mock_calls == [call()]
+        assert m_get_frame.mock_calls == [call(m_stack_frame)]
         assert cls.package_name == 'foobar'
         assert cls.package_file == '/tmp/foo.py'
         assert cls.package_dir == '/tmp'
