@@ -307,15 +307,33 @@ class AcceptanceHelpers(object):
         In the virtualenv at ``path``, run ``pip install [args]``.
 
         :param path: venv base/root path
+        :type path: str
         :param args: ``pip install`` arguments
+        :type args: list
         """
         pip = os.path.join(path, 'bin', 'pip')
         # get pip version
         res = _check_output([pip, '--version']).strip()
-        # install ALC in it
         final_args = [pip, 'install']
         final_args.extend(args)
         print_header("_pip_install() running: " + ' '.join(final_args))
+        res = _check_output(final_args, stderr=subprocess.STDOUT)
+        print(res)
+        print_header('DONE')
+
+    def _easy_install(self, path, args):
+        """
+        In the virtualenv at ``path``, run ``easy_install [args]``.
+
+        :param path: venv base/root path
+        :type path: str
+        :param args: ``easy_install`` arguments
+        :type args: list
+        """
+        easy_install = os.path.join(path, 'bin', 'easy_install')
+        final_args = [easy_install]
+        final_args.extend(args)
+        print_header("_easy_install() running: " + ' '.join(final_args))
         res = _check_output(final_args, stderr=subprocess.STDOUT)
         print(res)
         print_header('DONE')
@@ -1211,6 +1229,167 @@ class TestSetupPy(AcceptanceHelpers):
             print_header('running: %s' % ' '.join(cmd))
             output = _check_output(cmd, stderr=subprocess.STDOUT)
             print(output)
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+
+@pytest.mark.acceptance
+class TestEasyInstall(AcceptanceHelpers):
+
+    def test_install_local_master(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._easy_install(path, [test_src])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_sdist(self, capsys, tmpdir):
+        """regression test for issue #73"""
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
+        self._easy_install(path, [TEST_TARBALL_PATH])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_egg(self, capsys, tmpdir):
+        """regression test for issue #73"""
+        if TEST_EGG_PATH is None:
+            pytest.skip("No egg for python version")
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
+        self._easy_install(path, [TEST_TARBALL_PATH])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_local_master_in_git_repo(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._make_git_repo(path)
+        test_src = self._git_clone_test()
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, test_src))
+        self._easy_install(path, [test_src])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_sdist_in_git_repo(self, capsys, tmpdir):
+        """regression test for issue #73"""
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._make_git_repo(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
+        self._easy_install(path, [TEST_TARBALL_PATH])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_egg_in_git_repo(self, capsys, tmpdir):
+        """regression test for issue #73"""
+        if TEST_EGG_PATH is None:
+            pytest.skip("No egg for python version")
+        path = str(tmpdir)
+        self._make_venv(path)
+        self._make_git_repo(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
+        self._easy_install(path, [TEST_TARBALL_PATH])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,

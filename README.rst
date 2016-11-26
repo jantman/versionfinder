@@ -143,13 +143,14 @@ Currently-tested scenarios are:
   * setup.py develop
   * setup.py install
 
-@TODO:
+* easy_install
 
-- easy_install https://setuptools.readthedocs.io/en/latest/easy_install.html
-  - tarball
-  - egg
-  - source directory
-  - each of those with the venv in a git repo
+  * Install from sdist
+  * Install from egg
+  * Install from source directory
+  * Install from sdist in a venv that's also a git repo
+  * Install from egg in a venv that's also a git repo
+  * Install from source directory in a venv that's also a git repo
 
 Release Checklist
 -----------------
