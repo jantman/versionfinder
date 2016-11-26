@@ -49,6 +49,7 @@ import subprocess
 import json
 import requests
 import inspect
+import backoff
 from tempfile import mkdtemp
 from contextlib import contextmanager
 
@@ -74,9 +75,17 @@ TEST_BRANCH_COMMIT = 'a5f7fa6b3b7aa57aa2661633896ba61eb78bbc97'
 TEST_TARBALL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
                'download/{ver}/versionfinder_test_pkg-{ver}.tar' \
                '.gz'.format(ver=TEST_VERSION)
+TEST_TARBALL_PATH = None  # set by setup_module()
 TEST_WHEEL = 'https://github.com/jantman/versionfinder-test-pkg/releases/' \
              'download/{ver}/versionfinder_test_pkg-{ver}-py2.py3-none-any' \
              '.whl'.format(ver=TEST_VERSION)
+TEST_WHEEL_PATH = None  # set by setup_module()
+
+
+def setup_module(module):
+    global TEST_TARBALL_PATH, TEST_WHEEL_PATH
+    TEST_TARBALL_PATH = get_package(TEST_TARBALL)
+    TEST_WHEEL_PATH = get_package(TEST_WHEEL)
 
 
 @contextmanager
@@ -121,11 +130,9 @@ class AcceptanceHelpers(object):
     def setup_method(self, method):
         os.environ['VERSIONCHECK_DEBUG'] = 'true'
         print("\n")
+        self.source_dir = self._get_source_dir()
         self._set_git_config()
         self.current_venv_path = sys.prefix
-        self.source_dir = self._get_source_dir()
-        self.test_tarball = self._get_package(TEST_TARBALL)
-        self.test_wheel = self._get_package(TEST_WHEEL)
 
     def _get_source_dir(self):
         """
@@ -395,25 +402,6 @@ class AcceptanceHelpers(object):
             self._git_checkout(d, ref)
         return d
 
-    def _get_package(self, pkg_url):
-        """
-        Download the package from ``pkg_url`` to a tempdir.
-
-        :param pkg_url: url of the package to download
-        :type pkg_url: str
-        :return: path to the package on disk
-        :rtype: str
-        """
-        fname = pkg_url.split('/')[-1]
-        d = mkdtemp(prefix='pytest-versionfinder')
-        p = os.path.join(d, fname)
-        r = requests.get(pkg_url, stream=True)
-        assert r.status_code == 200
-        with open(p, 'wb') as fh:
-            for chunk in r:
-                fh.write(chunk)
-        return p
-
 
 @pytest.mark.acceptance
 class TestPip(AcceptanceHelpers):
@@ -624,8 +612,8 @@ class TestPip(AcceptanceHelpers):
         self._make_venv(path)
         with capsys_disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
-                inspect.stack()[0][0].f_code.co_name, path, self.test_tarball))
-        self._pip_install(path, [self.test_tarball])
+                inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
+        self._pip_install(path, [TEST_TARBALL_PATH])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -649,9 +637,9 @@ class TestPip(AcceptanceHelpers):
         self._make_venv(path)
         with capsys_disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
-                inspect.stack()[0][0].f_code.co_name, path, self.test_tarball))
+                inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
         self._pip_install(path, ['--force-reinstall', 'pip==1.5.4'])
-        self._pip_install(path, [self.test_tarball])
+        self._pip_install(path, [TEST_TARBALL_PATH])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -674,8 +662,8 @@ class TestPip(AcceptanceHelpers):
         self._make_venv(path)
         with capsys_disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
-                inspect.stack()[0][0].f_code.co_name, path, self.test_wheel))
-        self._pip_install(path, [self.test_wheel])
+                inspect.stack()[0][0].f_code.co_name, path, TEST_WHEEL_PATH))
+        self._pip_install(path, [TEST_WHEEL_PATH])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -1022,8 +1010,8 @@ class TestPip(AcceptanceHelpers):
         self._make_venv(path)
         with capsys_disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
-                inspect.stack()[0][0].f_code.co_name, path, self.test_tarball))
-        self._pip_install(path, [self.test_tarball])
+                inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
+        self._pip_install(path, [TEST_TARBALL_PATH])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -1048,8 +1036,8 @@ class TestPip(AcceptanceHelpers):
         self._make_venv(path)
         with capsys_disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
-                inspect.stack()[0][0].f_code.co_name, path, self.test_wheel))
-        self._pip_install(path, [self.test_wheel])
+                inspect.stack()[0][0].f_code.co_name, path, TEST_WHEEL_PATH))
+        self._pip_install(path, [TEST_WHEEL_PATH])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -1137,6 +1125,34 @@ class TestSetupPy(AcceptanceHelpers):
             }
         }
         assert sorted(actual) == sorted(expected)
+
+
+def get_package(pkg_url):
+    """
+    Download the package from ``pkg_url`` to a tempdir.
+
+    :param pkg_url: url of the package to download
+    :type pkg_url: str
+    :return: path to the package on disk
+    :rtype: str
+    """
+    fname = pkg_url.split('/')[-1]
+    d = mkdtemp(prefix='pytest-versionfinder')
+    p = os.path.join(d, fname)
+    r = requests_get(pkg_url)
+    assert r.status_code == 200
+    with open(p, 'wb') as fh:
+        for chunk in r:
+            fh.write(chunk)
+    return p
+
+
+# try up to 10 times to get a response that isn't rate-limited
+@backoff.on_predicate(backoff.expo,
+                      lambda r: r.status_code == 429, max_tries=10)
+def requests_get(pkg_url):
+    r = requests.get(pkg_url, stream=True)
+    return r
 
 
 def dictdiff(actual, expected, prefix=None):
