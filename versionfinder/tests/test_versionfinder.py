@@ -67,6 +67,12 @@ pbm = 'versionfinder.versionfinder'
 pb = '%s.VersionFinder' % pbm
 
 
+class BaseTest(object):
+
+    def setup_method(self, _):
+        self.cls = VersionFinder('foo', package_file='/foo/bar/baz.py')
+
+
 class TestInit(object):
 
     def test_init(self):
@@ -89,10 +95,7 @@ class TestInit(object):
         assert cls.package_dir == '/tmp'
 
 
-class TestFindPackageVersion(object):
-
-    def setup_method(self, _):
-        self.cls = VersionFinder('foo', package_file='/foo/bar/baz.py')
+class TestFindPackageVersion(BaseTest):
 
     def test_git_notag(self):
         with patch.multiple(
@@ -506,10 +509,7 @@ class TestFindPackageVersion(object):
         assert mock_is_git.mock_calls == [call()]
 
 
-class TestIsGitDirty(object):
-
-    def setup_method(self, _):
-        self.cls = VersionFinder('foo', package_file='/foo/bar/baz.py')
+class TestIsGitDirty(BaseTest):
 
     def test_is_git_dirty_false(self):
         with patch('%s._check_output' % pbm) as mock_check_out:
@@ -643,10 +643,7 @@ class TestIsGitDirty(object):
         ]
 
 
-class TestIsGitClone(object):
-
-    def setup_method(self, _):
-        self.cls = VersionFinder('foo', package_file='/foo/bar/baz.py')
+class TestIsGitClone(BaseTest):
 
     def test_true(self):
         with patch('%s.os.path.exists' % pbm) as mock_exists:
@@ -677,12 +674,10 @@ class TestIsGitClone(object):
               "top directory")
         assert 1 == 0
 
-class DONOTTest_VersionFinder(object):
-    """
-    Mocked unit tests for VersionFinder
-    """
 
-    def test_find_git_info(self):
+class TestFindGitInfo(BaseTest):
+
+    def test_find(self):
         cls = VersionFinder()
         # this is a horribly ugly way to get this to work on py26-py34
         mocks = {}
@@ -727,7 +722,7 @@ class DONOTTest_VersionFinder(object):
             'url': 'http://my.git/url'
         }
 
-    def test_find_git_info_no_git(self):
+    def test_no_git(self):
         cls = VersionFinder()
 
         def se_exc():
@@ -776,7 +771,10 @@ class DONOTTest_VersionFinder(object):
             'dirty': None,
         }
 
-    def test_get_dist_version_url(self):
+
+class TestGetDistVersionUrl(BaseTest):
+
+    def test_get(self):
         """pip 6.0+ - see issue #55"""
         dist = Mock(
             parsed_version=Version('1.2.3'),
@@ -814,7 +812,7 @@ class DONOTTest_VersionFinder(object):
         assert res == ('2.4.2',
                        'https://github.com/jantman/awslimitchecker')
 
-    def test_get_dist_version_url_pip1(self):
+    def test_pip1(self):
         """pip 1.x - see issue #54"""
         dist = Mock(
             parsed_version=('00000002', '00000004', '00000002', '*final'),
@@ -852,7 +850,7 @@ class DONOTTest_VersionFinder(object):
         assert res == ('2.4.2',
                        'https://github.com/jantman/awslimitchecker')
 
-    def test_get_dist_version_url_no_homepage(self):
+    def test_no_homepage(self):
         dist = Mock(
             version='1.2.3',
             PKG_INFO='PKG-INFO',
@@ -886,7 +884,10 @@ class DONOTTest_VersionFinder(object):
         res = cls._dist_version_url(dist)
         assert res == ('1.2.3', None)
 
-    def test_find_pip_info(self):
+
+class TestFindPipInfo(BaseTest):
+
+    def test_find(self):
         cls = VersionFinder()
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
         mock_distB = Mock(autospec=True, project_name='other')
@@ -911,7 +912,7 @@ class DONOTTest_VersionFinder(object):
         assert mock_from_dist.mock_calls == [call(mock_distA, [])]
         assert mock_dist_vu.mock_calls == [call(mock_distA)]
 
-    def test_find_pip_info_no_dist(self):
+    def test_no_dist(self):
         cls = VersionFinder()
         mock_distB = Mock(autospec=True, project_name='other')
         mock_distC = Mock(autospec=True, project_name='another')
@@ -935,7 +936,7 @@ class DONOTTest_VersionFinder(object):
         assert mock_from_dist.mock_calls == []
         assert mock_dist_vu.mock_calls == []
 
-    def test_find_pip_info_req_https(self):
+    def test_req_https(self):
         req_str = 'git+https://github.com/jantman/awslimitchecker.git@76c7e51' \
                   'f6e83350c72a1d3e8122ee03e589bbfde#egg=awslimitchecker-master'
         cls = VersionFinder()
@@ -962,7 +963,7 @@ class DONOTTest_VersionFinder(object):
         assert mock_from_dist.mock_calls == [call(mock_distA, [])]
         assert mock_dist_vu.mock_calls == [call(mock_distA)]
 
-    def test_find_pip_info_req_git(self):
+    def test_req_git(self):
         req_str = 'git+git@github.com:jantman/awslimitchecker.git@76c7e51f6e8' \
                   '3350c72a1d3e8122ee03e589bbfde#egg=awslimitchecker-master'
         cls = VersionFinder()
@@ -989,6 +990,9 @@ class DONOTTest_VersionFinder(object):
         assert mock_from_dist.mock_calls == [call(mock_distA, [])]
         assert mock_dist_vu.mock_calls == [call(mock_distA)]
 
+
+class TestFindPkgInfo(BaseTest):
+
     def test_find_pkg_info(self):
         cls = VersionFinder()
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
@@ -1000,26 +1004,23 @@ class DONOTTest_VersionFinder(object):
         assert res == {'version': '7.8.9', 'url': 'http://foobar'}
 
 
-class DONOTTest_VersionCheck_Funcs(object):
-    """
-    Mocked unit tests for versioncheck functions
-    """
+class TestGetGitRemotes(object):
 
-    pb = 'awslimitchecker.versioncheck'
-
-    def test_get_git_url_simple(self):
+    def test_simple(self):
         cmd_out = '' \
                 "origin  git@github.com:jantman/awslimitchecker.git (fetch)\n" \
                 "origin  git@github.com:jantman/awslimitchecker.git (push)\n"
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = cmd_out
-            res = _get_git_url()
-        assert res == 'git@github.com:jantman/awslimitchecker.git'
+            res = _get_git_remotes()
+        assert res == {
+            'origin': 'git@github.com:jantman/awslimitchecker.git'
+        }
         assert mock_check_out.mock_calls == [
             call(['git', 'remote', '-v'], stderr=DEVNULL)
         ]
 
-    def test_get_git_url_fork(self):
+    def test_fork(self):
         cmd_out = "origin  git@github.com:someone/awslimitchecker.git (fetch" \
                   ")\n" \
                   "origin  git@github.com:someone/awslimitchecker.git (push)" \
@@ -1028,15 +1029,18 @@ class DONOTTest_VersionCheck_Funcs(object):
                   "r.git (fetch)\n" \
                   "upstream        https://github.com/jantman/awslimitchecker" \
                   ".git (push)\n"
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = cmd_out
-            res = _get_git_url()
-        assert res == 'git@github.com:someone/awslimitchecker.git'
+            res = _get_git_remotes()
+        assert res == {
+            'origin': 'git@github.com:someone/awslimitchecker.git',
+            'upstream': 'https://github.com/jantman/awslimitchecker.git'
+        }
         assert mock_check_out.mock_calls == [
             call(['git', 'remote', '-v'], stderr=DEVNULL)
         ]
 
-    def test_get_git_url_no_origin(self):
+    def test_no_origin(self):
         cmd_out = "mine  git@github.com:someone/awslimitchecker.git (fetch" \
                   ")\n" \
                   "mine  git@github.com:someone/awslimitchecker.git (push)" \
@@ -1049,54 +1053,61 @@ class DONOTTest_VersionCheck_Funcs(object):
                   "r.git (fetch)\n" \
                   "another        https://github.com/foo/awslimitchecker" \
                   ".git (push)\n"
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = cmd_out
-            res = _get_git_url()
-        assert res == 'https://github.com/foo/awslimitchecker.git'
+            res = _get_git_remotes()
+        assert res == {
+            'another': 'https://github.com/foo/awslimitchecker.git',
+            'upstream': 'https://github.com/jantman/awslimitchecker.git',
+            'mine': 'git@github.com:someone/awslimitchecker.git'
+        }
         assert mock_check_out.mock_calls == [
             call(['git', 'remote', '-v'], stderr=DEVNULL)
         ]
 
-    def test_get_git_url_exception(self):
+    def test_exception(self):
 
         def se(foo, stderr=None):
             raise subprocess.CalledProcessError(3, 'mycommand')
 
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.side_effect = se
-            res = _get_git_url()
-        assert res is None
+            res = _get_git_remotes()
+        assert res == {}
         assert mock_check_out.mock_calls == [
             call(['git', 'remote', '-v'], stderr=DEVNULL)
         ]
 
-    def test_get_git_url_none(self):
+    def test_none(self):
         cmd_out = ''
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = cmd_out
-            res = _get_git_url()
-        assert res is None
+            res = _get_git_remotes()
+        assert res == {}
         assert mock_check_out.mock_calls == [
             call(['git', 'remote', '-v'], stderr=DEVNULL)
         ]
 
-    def test_get_git_url_no_fetch(self):
+    def test_no_fetch(self):
         cmd_out = "mine  git@github.com:someone/awslimitchecker.git (push)" \
                   "\n" \
                   "upstream        https://github.com/jantman/awslimitchecker" \
                   ".git (push)\n" \
                   "another        https://github.com/jantman/awslimitchecker" \
                   ".git (push)\n"
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = cmd_out
-            res = _get_git_url()
-        assert res is None
+            res = _get_git_remotes()
+        assert res == {}
         assert mock_check_out.mock_calls == [
             call(['git', 'remote', '-v'], stderr=DEVNULL)
         ]
 
-    def test_get_git_tag(self):
-        with patch('%s._check_output' % pb) as mock_check_out:
+
+class TestGetGitTag(object):
+
+    def test_get(self):
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = 'mytag'
             res = _get_git_tag('abcd')
         assert res == 'mytag'
@@ -1105,15 +1116,15 @@ class DONOTTest_VersionCheck_Funcs(object):
                  stderr=DEVNULL)
         ]
 
-    def test_get_git_tag_commit_none(self):
-        with patch('%s._check_output' % pb) as mock_check_out:
+    def test_commit_none(self):
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = 'mytag'
             res = _get_git_tag(None)
         assert res is None
         assert mock_check_out.mock_calls == []
 
-    def test_get_git_tag_no_tags(self):
-        with patch('%s._check_output' % pb) as mock_check_out:
+    def test_no_tags(self):
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = ''
             res = _get_git_tag('abcd')
         assert res is None
@@ -1122,12 +1133,12 @@ class DONOTTest_VersionCheck_Funcs(object):
                  stderr=DEVNULL)
         ]
 
-    def test_get_git_tag_exception(self):
+    def test_exception(self):
 
         def se(foo, stderr=None):
             raise subprocess.CalledProcessError(3, 'mycommand')
 
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.side_effect = se
             res = _get_git_tag('abcd')
         assert res is None
@@ -1136,8 +1147,11 @@ class DONOTTest_VersionCheck_Funcs(object):
                  stderr=DEVNULL)
         ]
 
-    def test_get_git_commit(self):
-        with patch('%s._check_output' % pb) as mock_check_out:
+
+class TestGetGitCommit(object):
+
+    def test_get(self):
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = '1234abcd'
             res = _get_git_commit()
         assert res == '1234abcd'
@@ -1146,12 +1160,12 @@ class DONOTTest_VersionCheck_Funcs(object):
                  stderr=DEVNULL)
         ]
 
-    def test_get_git_commit_exception(self):
+    def test_exception(self):
 
         def se(foo):
             raise subprocess.CalledProcessError(3, 'mycommand')
 
-        with patch('%s._check_output' % pb) as mock_check_out:
+        with patch('%s._check_output' % pbm) as mock_check_out:
             mock_check_out.side_effect = se
             res = _get_git_commit()
         assert res is None
@@ -1159,6 +1173,9 @@ class DONOTTest_VersionCheck_Funcs(object):
             call(['git', 'rev-parse', '--short', 'HEAD'],
                  stderr=DEVNULL)
         ]
+
+
+class TestCheckOutput(object):
 
     @pytest.mark.skipif(
         (
@@ -1170,10 +1187,10 @@ class DONOTTest_VersionCheck_Funcs(object):
                 sys.version_info[1],
                 sys.version_info[2]
         ))
-    def test_check_output_py26(self):
+    def test_py26(self):
         mock_p = Mock(returncode=0)
         mock_p.communicate.return_value = ('foo', 'bar')
-        with patch('%s.subprocess.Popen' % pb) as mock_popen:
+        with patch('%s.subprocess.Popen' % pbm) as mock_popen:
             mock_popen.return_value = mock_p
             res = _check_output(['mycmd'], stderr='something')
         assert res == 'foo'
@@ -1196,10 +1213,10 @@ class DONOTTest_VersionCheck_Funcs(object):
                 sys.version_info[1],
                 sys.version_info[2]
         ))
-    def test_check_output_py26_exception(self):
+    def test_py26_exception(self):
         mock_p = Mock(returncode=2)
         mock_p.communicate.return_value = ('foo', 'bar')
-        with patch('%s.subprocess.Popen' % pb) as mock_popen:
+        with patch('%s.subprocess.Popen' % pbm) as mock_popen:
             mock_popen.return_value = mock_p
             with pytest.raises(subprocess.CalledProcessError) as exc:
                 _check_output(['mycmd'], stderr='something')
@@ -1224,8 +1241,8 @@ class DONOTTest_VersionCheck_Funcs(object):
                 sys.version_info[1],
                 sys.version_info[2]
         ))
-    def test_check_output_py27(self):
-        with patch('%s.subprocess.check_output' % pb) as mock_check_out:
+    def test_py27(self):
+        with patch('%s.subprocess.check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = 'foobar'
             res = _check_output(['foo', 'bar'], stderr='something')
         assert res == 'foobar'
@@ -1239,8 +1256,8 @@ class DONOTTest_VersionCheck_Funcs(object):
                             sys.version_info[1],
                             sys.version_info[2]
                         ))
-    def test_check_output_py3(self):
-        with patch('%s.subprocess.check_output' % pb) as mock_check_out:
+    def test_py3(self):
+        with patch('%s.subprocess.check_output' % pbm) as mock_check_out:
             mock_check_out.return_value = 'foobar'.encode('utf-8')
             res = _check_output(['foo', 'bar'], stderr='something')
         assert res == 'foobar'
