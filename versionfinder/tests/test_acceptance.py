@@ -381,7 +381,7 @@ class AcceptanceHelpers(object):
             print(output)
         print_header('DONE')
 
-    def _git_clone_test(self, ref=None):
+    def _git_clone_test(self, ref=None, url=None):
         """
         Clone TEST_GIT_HTTPS_URL to a local temporary directory; checkout
         the specified ref.
@@ -389,11 +389,13 @@ class AcceptanceHelpers(object):
         :return: path to git clone
         :rtype: str
         """
+        if url is None:
+            url = TEST_GIT_HTTPS_URL
         d = mkdtemp(prefix='pytest-versionfinder')
         print_header('_git_clone_test(%s) cloning %s into %s' % (
-            ref, TEST_GIT_HTTPS_URL, d))
+            ref, url, d))
         output = _check_output(
-            ['git', 'clone', TEST_GIT_HTTPS_URL, d],
+            ['git', 'clone', url, d],
             stderr=subprocess.STDOUT
         )
         print(output)
@@ -484,12 +486,14 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': True,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': None,
+                'pip_requirement': 'git+%s@%s#egg=%s' % (
+                    TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT, TEST_PROJECT
+                ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_local_e_tag(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -522,7 +526,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_local_e_checkout_tag(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -550,7 +554,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_local_e_checkout_commit(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -578,7 +582,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_local_e_multiple_remotes(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -605,7 +609,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_sdist(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -629,7 +633,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_sdist_pip154(self, capsys, tmpdir):
         """regression test for issue #55"""
@@ -655,7 +659,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_bdist_wheel(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -679,7 +683,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -709,7 +713,37 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
+
+    def test_install_git_fork(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_FORK_HTTPS_URL
+            )
+        ])
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': {
+                    'origin': TEST_FORK_HTTPS_URL,
+                },
+                'git_is_dirty': False,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
 
     def test_install_git_commit(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -740,7 +774,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git_tag(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -771,7 +805,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git_branch(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -802,7 +836,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git_e(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -833,7 +867,44 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
+
+    def test_install_git_e_fork(self, capsys, tmpdir):
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, 'git'))
+        self._pip_install(path, [
+            '-e',
+            'git+%s#egg=versionfinder-test-pkg' % (
+                TEST_FORK_HTTPS_URL
+            )
+        ])
+        self._git_add_remote(
+            os.path.join(path, 'src', 'versionfinder-test-pkg'),
+            'upstream',
+            TEST_GIT_HTTPS_URL
+        )
+        actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': TEST_MASTER_COMMIT,
+                'git_tag': None,
+                'git_remotes': {
+                    'origin': TEST_FORK_HTTPS_URL,
+                    'upstream': TEST_GIT_HTTPS_URL,
+                },
+                'git_is_dirty': False,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': None,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
 
     def test_install_git_e_multiple_remotes(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -867,7 +938,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git_e_dirty(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -905,7 +976,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git_e_commit(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -937,7 +1008,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git_e_tag(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -969,7 +1040,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_git_e_branch(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -1001,7 +1072,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_sdist_in_git_repo(self, capsys, tmpdir):
         """regression test for issue #73"""
@@ -1027,7 +1098,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install_wheel_in_git_repo(self, capsys, tmpdir):
         """regression test for issue #73"""
@@ -1053,7 +1124,7 @@ class TestPip(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
 @pytest.mark.acceptance
 class TestSetupPy(AcceptanceHelpers):
@@ -1091,7 +1162,7 @@ class TestSetupPy(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
     def test_install(self, capsys, tmpdir):
         path = str(tmpdir)
@@ -1124,7 +1195,7 @@ class TestSetupPy(AcceptanceHelpers):
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
         }
-        assert sorted(actual) == sorted(expected)
+        assert actual == expected
 
 
 def get_package(pkg_url):

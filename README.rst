@@ -50,7 +50,7 @@ tag or commit from a git repo, or has local changes not committed to git.
 Requirements
 ------------
 
-* Python 2.6, 2.7, or Python 3.x
+* Python 2.6, 2.7, or Python 3.3+. Python 3.0-3.2 is not supported.
 
 Usage
 -----
@@ -124,10 +124,12 @@ Currently-tested scenarios are:
   * Install from sdist with pip 1.5.4
   * Install from wheel
   * Install from git URL
+  * Install from git fork URL
   * Install from git URL with commit
   * Install from git URL with tag
   * Install from git URL with branch
   * Install editable from git URL
+  * Install editable from git fork URL
   * Install editable from git URL with multiple remotes
   * Install editable from git URL and then change a file in the clone (dirty)
   * Install editable from git URL with commit
