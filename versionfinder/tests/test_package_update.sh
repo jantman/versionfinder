@@ -42,8 +42,7 @@ python setup.py bdist_egg
 deactivate
 
 # other eggs
-#for py in python2.6 python3.3 python3.4 python3.5; do
-for py in python2.6; do
+for py in python2.6 python3.3 python3.4 python3.5; do
     if [[ "$py" == "python3.2" ]]; then
         # we need virtualenv==13.1.2 on py32
         bin/pip install virtualenv==13.1.2
