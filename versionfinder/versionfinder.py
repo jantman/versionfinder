@@ -118,8 +118,8 @@ class VersionFinder(object):
             logger.debug("Found package_file as: %s", self.package_file)
         self.package_dir = os.path.dirname(self.package_file)
         logger.debug('package_dir: %s' % self.package_dir)
-        self.pip_locations = None
-        self.pkg_resources_locations = None
+        self._pip_locations = []
+        self._pkg_resources_locations = []
 
     def find_package_version(self):
         """
@@ -217,7 +217,7 @@ class VersionFinder(object):
         :rtype: dict
         """
         dist = pkg_resources.require(self.package_name)[0]
-        self.pkg_resources_locations = [dist.location]
+        self._pkg_resources_locations = [dist.location]
         ver, url = self._dist_version_url(dist)
         return {'version': ver, 'url': url}
 
@@ -240,7 +240,7 @@ class VersionFinder(object):
             logger.debug('could not find dist matching package_name')
             return res
         logger.debug('found dist: %s', dist)
-        self.pip_locations = [dist.location]
+        self._pip_locations = [dist.location]
         ver, url = self._dist_version_url(dist)
         res['version'] = ver
         res['url'] = url
@@ -276,17 +276,23 @@ class VersionFinder(object):
         :returns: information about the git clone
         :rtype: dict
         """
+        # @TODO split out to a _find_git_repo function that looks through
+        # self._package_top_dir ordered by length (longest first) and returns
+        # the first git repo it finds
         res = {'remotes': None, 'tag': None, 'commit': None, 'dirty': None}
-        newdir = os.path.dirname(os.path.abspath(self.package_dir))
-        with chdir(newdir):
-            res['commit'] = _get_git_commit()
+        for path in self._package_top_dir:
+            newdir = os.path.abspath(path)
+            with chdir(newdir):
+                res['commit'] = _get_git_commit()
+                if res['commit'] is not None:
+                    res['tag'] = _get_git_tag(res['commit'])
+                    res['remotes'] = _get_git_remotes()
+                try:
+                    res['dirty'] = self._is_git_dirty()
+                except Exception:
+                    pass
             if res['commit'] is not None:
-                res['tag'] = _get_git_tag(res['commit'])
-                res['remotes'] = _get_git_remotes()
-            try:
-                res['dirty'] = self._is_git_dirty()
-            except Exception:
-                pass
+                return res
         return res
 
     def _is_git_dirty(self):
@@ -321,13 +327,13 @@ class VersionFinder(object):
         :rtype: list
         """
         r = [self.package_dir]
-        for l in self.pip_locations:
+        for l in self._pip_locations:
             if l is not None:
                 r.append(l)
-        for l in self.pkg_resources_locations:
+        for l in self._pkg_resources_locations:
             if l is not None:
                 r.append(l)
-        return list(set(r))
+        return sorted(list(set(r)))
 
 
 def _check_output(args, stderr=None):

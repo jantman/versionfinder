@@ -39,15 +39,13 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 
 import pytest
 import sys
-import os
 import subprocess
 from textwrap import dedent
 from pip._vendor.packaging.version import Version
 
-import versionfinder.versionfinder
 from versionfinder.versionfinder import (
     _get_git_commit, _get_git_remotes, _get_git_tag, _check_output, DEVNULL,
-    VersionFinder
+    VersionFinder, chdir
 )
 from versionfinder.versioninfo import VersionInfo
 
@@ -77,14 +75,49 @@ class BaseTest(object):
 class TestInit(object):
 
     def test_init(self):
+        m_pip_logger = Mock()
         with patch('%s.inspect.stack' % pbm, autospec=True) as m_stack:
-            cls = VersionFinder('foobar', package_file='/foo/bar/baz.py')
+            with patch('%s.logger' % pbm, autospec=True) as m_logger:
+                with patch('%s.logging.getLogger' % pbm,
+                           autospec=True) as m_log_pip:
+                    m_log_pip.return_value = m_pip_logger
+                    cls = VersionFinder('foobar',
+                                        package_file='/foo/bar/baz.py')
         assert m_stack.mock_calls == []
         assert cls.package_name == 'foobar'
         assert cls.package_file == '/foo/bar/baz.py'
         assert cls.package_dir == '/foo/bar'
+        assert m_logger.mock_calls == [
+            call.setLevel(logging.CRITICAL),
+            call.debug('Finding package version for: %s', 'foobar'),
+            call.debug('Explicit package file: %s', '/foo/bar/baz.py'),
+            call.debug('package_dir: /foo/bar')
+        ]
+        assert m_log_pip.mock_calls == [call('pip')]
+        assert m_pip_logger.mock_calls == [call.setLevel(logging.CRITICAL)]
 
-    def test_init_no_file(self):
+    def test_init_log_true(self):
+        m_pip_logger = Mock()
+        with patch('%s.inspect.stack' % pbm, autospec=True) as m_stack:
+            with patch('%s.logger' % pbm, autospec=True) as m_logger:
+                with patch('%s.logging.getLogger' % pbm,
+                           autospec=True) as m_log_pip:
+                    m_log_pip.return_value = m_pip_logger
+                    cls = VersionFinder('foobar', log=True,
+                                        package_file='/foo/bar/baz.py')
+        assert m_stack.mock_calls == []
+        assert cls.package_name == 'foobar'
+        assert cls.package_file == '/foo/bar/baz.py'
+        assert cls.package_dir == '/foo/bar'
+        assert m_logger.mock_calls == [
+            call.debug('Finding package version for: %s', 'foobar'),
+            call.debug('Explicit package file: %s', '/foo/bar/baz.py'),
+            call.debug('package_dir: /foo/bar')
+        ]
+        assert m_log_pip.mock_calls == []
+        assert m_pip_logger.mock_calls == []
+
+    def test_init_no_file_no_frame(self):
         m_frame = Mock()
         type(m_frame).filename = '/tmp/foo.py'
         m_stack_frame = Mock()
@@ -94,6 +127,21 @@ class TestInit(object):
                 m_get_frame.return_value = m_frame
                 cls = VersionFinder('foobar')
         assert m_stack.mock_calls == [call()]
+        assert m_get_frame.mock_calls == [call(m_stack_frame)]
+        assert cls.package_name == 'foobar'
+        assert cls.package_file == '/tmp/foo.py'
+        assert cls.package_dir == '/tmp'
+
+    def test_init_no_file(self):
+        m_frame = Mock()
+        type(m_frame).filename = '/tmp/foo.py'
+        m_stack_frame = Mock()
+        with patch('%s.inspect.stack' % pbm, autospec=True) as m_stack:
+            with patch('%s.inspect.getframeinfo' % pbm) as m_get_frame:
+                m_stack.return_value = [None, []]
+                m_get_frame.return_value = m_frame
+                cls = VersionFinder('foobar', caller_frame=m_stack_frame)
+        assert m_stack.mock_calls == []
         assert m_get_frame.mock_calls == [call(m_stack_frame)]
         assert cls.package_name == 'foobar'
         assert cls.package_file == '/tmp/foo.py'
@@ -118,7 +166,8 @@ class TestFindPackageVersion(BaseTest):
             }
             mocks['_find_pip_info'].return_value = {
                 'version': '1.2.3',
-                'url': 'http://my.package.url/pip'
+                'url': 'http://my.package.url/pip',
+                'foo': None
             }
             mocks['_find_pkg_info'].return_value = {
                 'version': '1.2.3',
@@ -194,7 +243,8 @@ class TestFindPackageVersion(BaseTest):
                 'remotes': {'origin': 'git+https://foo'},
                 'tag': 'mytag',
                 'commit': '12345678',
-                'dirty': False
+                'dirty': False,
+                'foo': None
             }
             mocks['_find_pip_info'].return_value = {
                 'version': '1.2.3',
@@ -587,7 +637,6 @@ class TestIsGitClone(BaseTest):
         assert 1 == 0
 
 
-@pytest.mark.skip
 class TestFindGitInfo(BaseTest):
 
     def test_find(self):
@@ -598,6 +647,7 @@ class TestFindGitInfo(BaseTest):
             _get_git_commit=DEFAULT,
             _get_git_tag=DEFAULT,
             _get_git_remotes=DEFAULT,
+            chdir=DEFAULT,
         ) as mocks1:
             mocks.update(mocks1)
             with patch.multiple(
@@ -605,33 +655,36 @@ class TestFindGitInfo(BaseTest):
                 _is_git_dirty=DEFAULT,
             ) as mocks2:
                 mocks.update(mocks2)
-                with patch.multiple(
-                    '%s.os' % pbm,
-                    getcwd=DEFAULT,
-                    chdir=DEFAULT,
-                ) as mocks3:
-                    mocks.update(mocks3)
-                    mocks['getcwd'].return_value = '/my/cwd'
-                    mocks['_get_git_commit'].return_value = '12345678'
+                with patch('%s._package_top_dir' % pb,
+                           new_callable=PropertyMock) as m_top_dir:
+                    mocks['_get_git_commit'].side_effect = [None, '12345678']
                     mocks['_get_git_tag'].return_value = 'mytag'
-                    mocks['_get_git_remotes'].return_value = 'http://my.git/url'
-                    mocks['_is_git_dirty'].return_value = False
+                    mocks['_get_git_remotes'].return_value = {
+                        'origin': 'http://my.git/url'
+                    }
+                    mocks['_is_git_dirty'].side_effect = [None, False]
+                    m_top_dir.return_value = [
+                        '/dir/one',
+                        '/dir/two'
+                    ]
                     res = self.cls._find_git_info()
-        assert mocks['_get_git_commit'].mock_calls == [call()]
+        assert mocks['_get_git_commit'].mock_calls == [call(), call()]
         assert mocks['_get_git_tag'].mock_calls == [call('12345678')]
         assert mocks['_get_git_remotes'].mock_calls == [call()]
-        assert mocks['_is_git_dirty'].mock_calls == [call()]
-        assert mocks['getcwd'].mock_calls == [call()]
+        assert mocks['_is_git_dirty'].mock_calls == [call(), call()]
         assert mocks['chdir'].mock_calls == [
-            call(os.path.dirname(os.path.abspath(
-                versionfinder.versionfinder.__file__))),
-            call('/my/cwd')
+            call('/dir/one'),
+            call().__enter__(),
+            call().__exit__(None, None, None),
+            call('/dir/two'),
+            call().__enter__(),
+            call().__exit__(None, None, None),
         ]
         assert res == {
             'commit': '12345678',
             'dirty': False,
             'tag': 'mytag',
-            'url': 'http://my.git/url'
+            'remotes': {'origin': 'http://my.git/url'}
         }
 
     def test_no_git(self):
@@ -646,6 +699,7 @@ class TestFindGitInfo(BaseTest):
             _get_git_commit=DEFAULT,
             _get_git_tag=DEFAULT,
             _get_git_remotes=DEFAULT,
+            chdir=DEFAULT,
         ) as mocks1:
             mocks.update(mocks1)
             with patch.multiple(
@@ -653,32 +707,33 @@ class TestFindGitInfo(BaseTest):
                 _is_git_dirty=DEFAULT,
             ) as mocks2:
                 mocks.update(mocks2)
-                with patch.multiple(
-                    '%s.os' % pbm,
-                    getcwd=DEFAULT,
-                    chdir=DEFAULT,
-                ) as mocks3:
-                    mocks.update(mocks3)
-                    mocks['getcwd'].return_value = '/my/cwd'
+                with patch('%s._package_top_dir' % pb,
+                           new_callable=PropertyMock) as m_top_dir:
                     mocks['_get_git_commit'].return_value = None
                     mocks['_get_git_tag'].return_value = 'mytag'
                     mocks['_get_git_remotes'].return_value = 'http://my.git/url'
                     mocks['_is_git_dirty'].side_effect = se_exc
+                    m_top_dir.return_value = [
+                        '/dir/one',
+                        '/dir/two'
+                    ]
                     res = self.cls._find_git_info()
-        assert mocks['_get_git_commit'].mock_calls == [call()]
+        assert mocks['_get_git_commit'].mock_calls == [call(), call()]
         assert mocks['_get_git_tag'].mock_calls == []
         assert mocks['_get_git_remotes'].mock_calls == []
-        assert mocks['_is_git_dirty'].mock_calls == [call()]
-        assert mocks['getcwd'].mock_calls == [call()]
+        assert mocks['_is_git_dirty'].mock_calls == [call(), call()]
         assert mocks['chdir'].mock_calls == [
-            call(os.path.dirname(os.path.abspath(
-                versionfinder.versionfinder.__file__))),
-            call('/my/cwd')
+            call('/dir/one'),
+            call().__enter__(),
+            call().__exit__(None, None, None),
+            call('/dir/two'),
+            call().__enter__(),
+            call().__exit__(None, None, None),
         ]
         assert res == {
             'commit': None,
             'tag': None,
-            'url': None,
+            'remotes': None,
             'dirty': None,
         }
 
@@ -793,17 +848,16 @@ class TestGetDistVersionUrl(BaseTest):
         assert res == ('1.2.3', None)
 
 
-@pytest.mark.skip
 class TestFindPipInfo(BaseTest):
 
     def test_find(self):
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
-        mock_distB = Mock(autospec=True, project_name='other')
+        mock_distB = Mock(autospec=True, project_name='foo')
         mock_distC = Mock(autospec=True, project_name='another')
         installed_dists = [mock_distA, mock_distB, mock_distC]
         mock_frozen = Mock(
             autospec=True,
-            req='awslimitchecker==0.1.0'
+            req='foo==4.5.6'
         )
 
         with patch('%s.pip.get_installed_distributions' % pbm
@@ -815,10 +869,11 @@ class TestFindPipInfo(BaseTest):
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
                     res = self.cls._find_pip_info()
-        assert res == {'version': '4.5.6', 'url': 'http://foo'}
+        assert res == {'version': '4.5.6', 'url': 'http://foo',
+                       'requirement': 'foo==4.5.6'}
         assert mock_pgid.mock_calls == [call()]
-        assert mock_from_dist.mock_calls == [call(mock_distA, [])]
-        assert mock_dist_vu.mock_calls == [call(mock_distA)]
+        assert mock_from_dist.mock_calls == [call(mock_distB, [])]
+        assert mock_dist_vu.mock_calls == [call(mock_distB)]
 
     def test_no_dist(self):
         mock_distB = Mock(autospec=True, project_name='other')
@@ -844,10 +899,10 @@ class TestFindPipInfo(BaseTest):
         assert mock_dist_vu.mock_calls == []
 
     def test_req_https(self):
-        req_str = 'git+https://github.com/jantman/awslimitchecker.git@76c7e51' \
-                  'f6e83350c72a1d3e8122ee03e589bbfde#egg=awslimitchecker-master'
+        req_str = 'git+https://github.com/jantman/foo.git@76c7e51' \
+                  'f6e83350c72a1d3e8122ee03e589bbfde#egg=foo-master'
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
-        mock_distB = Mock(autospec=True, project_name='other')
+        mock_distB = Mock(autospec=True, project_name='foo')
         mock_distC = Mock(autospec=True, project_name='another')
         installed_dists = [mock_distA, mock_distB, mock_distC]
         mock_frozen = Mock(
@@ -864,16 +919,17 @@ class TestFindPipInfo(BaseTest):
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
                     res = self.cls._find_pip_info()
-        assert res == {'version': '4.5.6', 'url': req_str}
+        assert res == {'version': '4.5.6', 'url': 'http://foo',
+                       'requirement': req_str}
         assert mock_pgid.mock_calls == [call()]
-        assert mock_from_dist.mock_calls == [call(mock_distA, [])]
-        assert mock_dist_vu.mock_calls == [call(mock_distA)]
+        assert mock_from_dist.mock_calls == [call(mock_distB, [])]
+        assert mock_dist_vu.mock_calls == [call(mock_distB)]
 
     def test_req_git(self):
-        req_str = 'git+git@github.com:jantman/awslimitchecker.git@76c7e51f6e8' \
-                  '3350c72a1d3e8122ee03e589bbfde#egg=awslimitchecker-master'
+        req_str = 'git+git@github.com:jantman/foo.git@76c7e51f6e8' \
+                  '3350c72a1d3e8122ee03e589bbfde#egg=foo-master'
         mock_distA = Mock(autospec=True, project_name='awslimitchecker')
-        mock_distB = Mock(autospec=True, project_name='other')
+        mock_distB = Mock(autospec=True, project_name='foo')
         mock_distC = Mock(autospec=True, project_name='another')
         installed_dists = [mock_distA, mock_distB, mock_distC]
         mock_frozen = Mock(
@@ -890,10 +946,11 @@ class TestFindPipInfo(BaseTest):
                     mock_from_dist.return_value = mock_frozen
                     mock_dist_vu.return_value = ('4.5.6', 'http://foo')
                     res = self.cls._find_pip_info()
-        assert res == {'version': '4.5.6', 'url': req_str}
+        assert res == {'version': '4.5.6', 'url': 'http://foo',
+                       'requirement': req_str}
         assert mock_pgid.mock_calls == [call()]
-        assert mock_from_dist.mock_calls == [call(mock_distA, [])]
-        assert mock_dist_vu.mock_calls == [call(mock_distA)]
+        assert mock_from_dist.mock_calls == [call(mock_distB, [])]
+        assert mock_dist_vu.mock_calls == [call(mock_distB)]
 
 
 class TestFindPkgInfo(BaseTest):
@@ -1079,6 +1136,33 @@ class TestGetGitCommit(object):
         ]
 
 
+class TestPackageTopDir(BaseTest):
+
+    def test_none(self):
+        self.cls.package_dir = '/foo'
+        self.cls._pip_locations = []
+        self.cls._pkg_resources_locations = []
+        assert self.cls._package_top_dir == ['/foo']
+
+    def test_pip(self):
+        self.cls.package_dir = '/foo'
+        self.cls._pip_locations = ['/bar', '/baz', None]
+        self.cls._pkg_resources_locations = []
+        assert self.cls._package_top_dir == ['/bar', '/baz', '/foo']
+
+    def test_pkg_resources(self):
+        self.cls.package_dir = '/foo'
+        self.cls._pip_locations = []
+        self.cls._pkg_resources_locations = ['/bar', '/baz', None]
+        assert self.cls._package_top_dir == ['/bar', '/baz', '/foo']
+
+    def test_all(self):
+        self.cls.package_dir = '/foo'
+        self.cls._pip_locations = ['/bar', None]
+        self.cls._pkg_resources_locations = ['/baz', None]
+        assert self.cls._package_top_dir == ['/bar', '/baz', '/foo']
+
+
 class TestCheckOutput(object):
 
     @pytest.mark.skipif(
@@ -1167,4 +1251,18 @@ class TestCheckOutput(object):
         assert res == 'foobar'
         assert mock_check_out.mock_calls == [
             call(['foo', 'bar'], stderr='something')
+        ]
+
+
+class TestChdir(object):
+
+    def test_chdir(self):
+        with patch('%s.os.getcwd' % pbm, autospec=True) as mock_getcwd:
+            with patch('%s.os.chdir' % pbm, autospec=True) as mock_chdir:
+                mock_getcwd.return_value = '/old/cwd'
+                with chdir('/new/dir'):
+                    pass
+        assert mock_chdir.mock_calls == [
+            call('/new/dir'),
+            call('/old/cwd')
         ]
