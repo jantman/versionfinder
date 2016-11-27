@@ -37,10 +37,170 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
-# from versionfinder.versioninfo import VersionInfo
+from versionfinder.versioninfo import VersionInfo
 
 
 class TestInit(object):
 
-    def test_init(self):
-        pass
+    def test_init_all(self):
+        v = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl'
+            },
+            git_is_dirty=True
+        )
+        assert v._pip_version == 'pipver'
+        assert v._pip_url == 'pipurl'
+        assert v._pip_requirement == 'preq'
+        assert v._pkg_resources_version == 'prver'
+        assert v._pkg_resources_url == 'prurl'
+        assert v._git_tag == 'tag'
+        assert v._git_commit == 'commit'
+        assert v._git_remotes == {
+            'origin': 'ourl'
+        }
+        assert v._git_is_dirty is True
+
+    def test_init_empty(self):
+        v = VersionInfo()
+        assert v._pip_version is None
+        assert v._pip_url is None
+        assert v._pip_requirement is None
+        assert v._pkg_resources_version is None
+        assert v._pkg_resources_url is None
+        assert v._git_tag is None
+        assert v._git_commit is None
+        assert v._git_remotes is None
+        assert v._git_is_dirty is None
+
+
+class TestAsDict(object):
+
+    def test_dict(self):
+        d = {
+            'pip_version': 'pipver',
+            'pip_url': 'pipurl',
+            'pip_requirement': 'preq',
+            'pkg_resources_version': 'prver',
+            'pkg_resources_url': 'prurl',
+            'git_tag': 'tag',
+            'git_commit': 'commit',
+            'git_remotes': {
+                'origin': 'ourl'
+            },
+            'git_is_dirty': True
+        }
+        v = VersionInfo(**d)
+        assert v.as_dict == d
+
+
+class TestRepr(object):
+
+    def test_repr(self):
+        v = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl'
+            },
+            git_is_dirty=True
+        )
+        s = 'VersionInfo('
+        s += 'git_commit=commit, '
+        s += 'git_is_dirty=True, '
+        s += "git_remotes={'origin': 'ourl'}, "
+        s += 'git_tag=tag, '
+        s += 'pip_requirement=preq, '
+        s += 'pip_url=pipurl, '
+        s += 'pip_version=pipver, '
+        s += 'pkg_resources_url=prurl, '
+        s += 'pkg_resources_version=prver'
+        s += ')'
+        assert v.__repr__() == s
+
+
+class TestEq(object):
+
+    def test_equal(self):
+        v1 = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl'
+            },
+            git_is_dirty=True
+        )
+        v2 = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl'
+            },
+            git_is_dirty=True
+        )
+        assert v1 == v2
+
+    def test_not_equal(self):
+        v1 = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl'
+            },
+            git_is_dirty=True
+        )
+        v2 = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl'
+            },
+            git_is_dirty=False
+        )
+        v3 = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl2'
+            },
+            git_is_dirty=True
+        )
+        assert v1 != v2
+        assert v1 != v3
