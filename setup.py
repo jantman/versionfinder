@@ -64,7 +64,7 @@ setup(
     description='Python package to find the version of another package, '
                 'whether installed via pip, setuptools or git.',
     long_description=long_description,
-    #install_requires=requires,
+    install_requires=['GitPython>=2.1.0,<2.2.0'],
     keywords="version git pip pkg_resources setuptools",
     classifiers=classifiers
 )
