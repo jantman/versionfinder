@@ -174,8 +174,9 @@ class VersionFinder(object):
         logger.debug("pkg_resources info: %s", pkg_info)
         for k, v in pkg_info.items():
             res['pkg_resources_' + k] = v
-        if self._is_git_clone:
-            git_info = self._find_git_info()
+        gitdir = self._git_repo_path
+        if gitdir is not None:
+            git_info = self._find_git_info(gitdir)
             logger.debug("Git info: %s", git_info)
             for k, v in git_info.items():
                 if k == 'dirty':
@@ -192,22 +193,22 @@ class VersionFinder(object):
         return VersionInfo(**res)
 
     @property
-    def _is_git_clone(self):
+    def _git_repo_path(self):
         """
-        Attempt to determine whether this package is installed via git or not.
+        Attempt to determine whether this package is installed via git or not;
+        if so, return the path to the git repository.
 
-        :rtype: bool
-        :returns: True if installed via git, False otherwise
+        :rtype: str
+        :returns: path to git repo, or None
         """
-        # this is why test_install_local_e is failing - the git clone is
-        # one directory above where we're looking
         logger.debug('Checking for git directory in: %s', self._package_top_dir)
         for p in self._package_top_dir:
-            if os.path.exists(os.path.join(p, '.git')):
-                logger.debug('_is_git_clone() true based on %s/.git' % p)
-                return True
+            gitdir = os.path.join(p, '.git')
+            if os.path.exists(gitdir):
+                logger.debug('_is_git_clone() true based on %s' % gitdir)
+                return gitdir
         logger.debug('_is_git_clone() false')
-        return False
+        return None
 
     def _find_pkg_info(self):
         """
@@ -269,30 +270,25 @@ class VersionFinder(object):
                 url = v.strip()
         return (ver, url)
 
-    def _find_git_info(self):
+    def _find_git_info(self, gitdir):
         """
         Find information about the git repository, if this file is in a clone.
 
+        :param gitdir: path to the git repo's .git directory
+        :type gitdir: str
         :returns: information about the git clone
         :rtype: dict
         """
-        # @TODO split out to a _find_git_repo function that looks through
-        # self._package_top_dir ordered by length (longest first) and returns
-        # the first git repo it finds
         res = {'remotes': None, 'tag': None, 'commit': None, 'dirty': None}
-        for path in self._package_top_dir:
-            newdir = os.path.abspath(path)
-            with chdir(newdir):
-                res['commit'] = _get_git_commit()
-                if res['commit'] is not None:
-                    res['tag'] = _get_git_tag(res['commit'])
-                    res['remotes'] = _get_git_remotes()
-                try:
-                    res['dirty'] = self._is_git_dirty()
-                except Exception:
-                    pass
+        with chdir(gitdir):
+            res['commit'] = _get_git_commit()
             if res['commit'] is not None:
-                return res
+                res['tag'] = _get_git_tag(res['commit'])
+                res['remotes'] = _get_git_remotes()
+            try:
+                res['dirty'] = self._is_git_dirty()
+            except Exception:
+                pass
         return res
 
     def _is_git_dirty(self):

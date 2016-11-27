@@ -173,9 +173,9 @@ class TestFindPackageVersion(BaseTest):
                 'version': '1.2.3',
                 'url': 'http://my.package.url/pkg_resources'
             }
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
+                mock_is_git.return_value = '/git/repo/.git'
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pip_version='1.2.3',
@@ -186,7 +186,9 @@ class TestFindPackageVersion(BaseTest):
             git_is_dirty=False,
             git_remotes={'origin': 'git+https://foo'}
         ).as_dict
-        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_git_info'].mock_calls == [
+            call(self.cls, '/git/repo/.git')
+        ]
         assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
         assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
         assert mock_is_git.mock_calls == [call()]
@@ -213,9 +215,9 @@ class TestFindPackageVersion(BaseTest):
                 'version': '1.2.3',
                 'url': 'http://my.package.url/pkg_resources'
             }
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
+                mock_is_git.return_value = '/git/repo/.git'
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pip_version='1.2.3',
@@ -226,7 +228,9 @@ class TestFindPackageVersion(BaseTest):
             git_is_dirty=True,
             git_remotes={'origin': 'git+https://foo'}
         ).as_dict
-        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_git_info'].mock_calls == [
+            call(self.cls, '/git/repo/.git')
+        ]
         assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
         assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
         assert mock_is_git.mock_calls == [call()]
@@ -254,9 +258,9 @@ class TestFindPackageVersion(BaseTest):
                 'version': '1.2.3',
                 'url': 'http://my.package.url/pkg_resources'
             }
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
+                mock_is_git.return_value = '/git/repo/.git'
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pip_version='1.2.3',
@@ -268,7 +272,9 @@ class TestFindPackageVersion(BaseTest):
             git_tag='mytag',
             git_remotes={'origin': 'git+https://foo'}
         ).as_dict
-        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_git_info'].mock_calls == [
+            call(self.cls, '/git/repo/.git')
+        ]
         assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
         assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
         assert mock_is_git.mock_calls == [call()]
@@ -295,9 +301,9 @@ class TestFindPackageVersion(BaseTest):
                 'version': '1.2.3',
                 'url': 'http://my.package.url/pkg_resources'
             }
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
+                mock_is_git.return_value = '/git/repo/.git'
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pip_version='1.2.3',
@@ -309,7 +315,9 @@ class TestFindPackageVersion(BaseTest):
             git_tag='mytag',
             git_remotes={'origin': 'git+https://foo'}
         ).as_dict
-        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_git_info'].mock_calls == [
+            call(self.cls, '/git/repo/.git')
+        ]
         assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
         assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
         assert mock_is_git.mock_calls == [call()]
@@ -337,9 +345,9 @@ class TestFindPackageVersion(BaseTest):
                 'url': 'http://my.package.url/pip'
             }
             mocks['_find_pkg_info'].side_effect = se_exception
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
+                mock_is_git.return_value = '/git/repo/.git'
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pip_version='1.2.3',
@@ -348,7 +356,9 @@ class TestFindPackageVersion(BaseTest):
             git_is_dirty=False,
             git_remotes={'origin': 'git+https://foo'}
         ).as_dict
-        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_git_info'].mock_calls == [
+            call(self.cls, '/git/repo/.git')
+        ]
         assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
         assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
         assert mock_is_git.mock_calls == [call()]
@@ -376,9 +386,9 @@ class TestFindPackageVersion(BaseTest):
                 'version': '1.2.3',
                 'url': 'http://my.package.url/pkg_resources'
             }
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = True
+                mock_is_git.return_value = '/git/repo/.git'
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pkg_resources_version='1.2.3',
@@ -387,7 +397,9 @@ class TestFindPackageVersion(BaseTest):
             git_is_dirty=False,
             git_remotes={'origin': 'git+https://foo'}
         ).as_dict
-        assert mocks['_find_git_info'].mock_calls == [call(self.cls)]
+        assert mocks['_find_git_info'].mock_calls == [
+            call(self.cls, '/git/repo/.git')
+        ]
         assert mocks['_find_pip_info'].mock_calls == [call(self.cls)]
         assert mocks['_find_pkg_info'].mock_calls == [call(self.cls)]
         assert mock_is_git.mock_calls == [call()]
@@ -415,9 +427,9 @@ class TestFindPackageVersion(BaseTest):
                 'version': '1.2.3',
                 'url': 'http://my.package.url/pkg_resources'
             }
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = False
+                mock_is_git.return_value = None
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pip_version='1.2.3',
@@ -453,9 +465,9 @@ class TestFindPackageVersion(BaseTest):
                 'version': '1.2.3',
                 'url': 'http://my.package.url/pkg_resources'
             }
-            with patch('%s._is_git_clone' % pb,
+            with patch('%s._git_repo_path' % pb,
                        new_callable=PropertyMock) as mock_is_git:
-                mock_is_git.return_value = False
+                mock_is_git.return_value = None
                 res = self.cls.find_package_version()
         assert res.as_dict == VersionInfo(
             pkg_resources_version='1.2.3',
@@ -601,7 +613,7 @@ class TestIsGitDirty(BaseTest):
         ]
 
 
-class TestIsGitClone(BaseTest):
+class TestGitRepoPath(BaseTest):
 
     def test_true(self):
         with patch('%s.os.path.exists' % pbm) as mock_exists:
@@ -609,8 +621,8 @@ class TestIsGitClone(BaseTest):
                        new_callable=PropertyMock) as mock_top_dir:
                 mock_top_dir.return_value = ['/foo/bar', '/foo/bar/baz']
                 mock_exists.side_effect = [False, True]
-                res = self.cls._is_git_clone
-        assert res is True
+                res = self.cls._git_repo_path
+        assert res == '/foo/bar/baz/.git'
         assert mock_exists.mock_calls == [
             call('/foo/bar/.git'),
             call('/foo/bar/baz/.git')
@@ -622,8 +634,8 @@ class TestIsGitClone(BaseTest):
                        new_callable=PropertyMock) as mock_top_dir:
                 mock_top_dir.return_value = ['/foo/bar', '/foo/bar/baz']
                 mock_exists.return_value = False
-                res = self.cls._is_git_clone
-        assert res is False
+                res = self.cls._git_repo_path
+        assert res is None
         assert mock_exists.mock_calls == [
             call('/foo/bar/.git'),
             call('/foo/bar/baz/.git')
@@ -655,30 +667,21 @@ class TestFindGitInfo(BaseTest):
                 _is_git_dirty=DEFAULT,
             ) as mocks2:
                 mocks.update(mocks2)
-                with patch('%s._package_top_dir' % pb,
-                           new_callable=PropertyMock) as m_top_dir:
-                    mocks['_get_git_commit'].side_effect = [None, '12345678']
-                    mocks['_get_git_tag'].return_value = 'mytag'
-                    mocks['_get_git_remotes'].return_value = {
-                        'origin': 'http://my.git/url'
-                    }
-                    mocks['_is_git_dirty'].side_effect = [None, False]
-                    m_top_dir.return_value = [
-                        '/dir/one',
-                        '/dir/two'
-                    ]
-                    res = self.cls._find_git_info()
-        assert mocks['_get_git_commit'].mock_calls == [call(), call()]
+                mocks['_get_git_commit'].return_value = '12345678'
+                mocks['_get_git_tag'].return_value = 'mytag'
+                mocks['_get_git_remotes'].return_value = {
+                    'origin': 'http://my.git/url'
+                }
+                mocks['_is_git_dirty'].return_value = False
+                res = self.cls._find_git_info('/git/repo/.git')
+        assert mocks['_get_git_commit'].mock_calls == [call()]
         assert mocks['_get_git_tag'].mock_calls == [call('12345678')]
         assert mocks['_get_git_remotes'].mock_calls == [call()]
-        assert mocks['_is_git_dirty'].mock_calls == [call(), call()]
+        assert mocks['_is_git_dirty'].mock_calls == [call()]
         assert mocks['chdir'].mock_calls == [
-            call('/dir/one'),
+            call('/git/repo/.git'),
             call().__enter__(),
-            call().__exit__(None, None, None),
-            call('/dir/two'),
-            call().__enter__(),
-            call().__exit__(None, None, None),
+            call().__exit__(None, None, None)
         ]
         assert res == {
             'commit': '12345678',
@@ -707,28 +710,19 @@ class TestFindGitInfo(BaseTest):
                 _is_git_dirty=DEFAULT,
             ) as mocks2:
                 mocks.update(mocks2)
-                with patch('%s._package_top_dir' % pb,
-                           new_callable=PropertyMock) as m_top_dir:
-                    mocks['_get_git_commit'].return_value = None
-                    mocks['_get_git_tag'].return_value = 'mytag'
-                    mocks['_get_git_remotes'].return_value = 'http://my.git/url'
-                    mocks['_is_git_dirty'].side_effect = se_exc
-                    m_top_dir.return_value = [
-                        '/dir/one',
-                        '/dir/two'
-                    ]
-                    res = self.cls._find_git_info()
-        assert mocks['_get_git_commit'].mock_calls == [call(), call()]
+                mocks['_get_git_commit'].return_value = None
+                mocks['_get_git_tag'].return_value = 'mytag'
+                mocks['_get_git_remotes'].return_value = 'http://my.git/url'
+                mocks['_is_git_dirty'].side_effect = se_exc
+                res = self.cls._find_git_info('/git/repo/.git')
+        assert mocks['_get_git_commit'].mock_calls == [call()]
         assert mocks['_get_git_tag'].mock_calls == []
         assert mocks['_get_git_remotes'].mock_calls == []
-        assert mocks['_is_git_dirty'].mock_calls == [call(), call()]
+        assert mocks['_is_git_dirty'].mock_calls == [call()]
         assert mocks['chdir'].mock_calls == [
-            call('/dir/one'),
+            call('/git/repo/.git'),
             call().__enter__(),
-            call().__exit__(None, None, None),
-            call('/dir/two'),
-            call().__enter__(),
-            call().__exit__(None, None, None),
+            call().__exit__(None, None, None)
         ]
         assert res == {
             'commit': None,
