@@ -38,20 +38,11 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 """
 
 import os
-import subprocess
 import logging
-import re
-import sys
-import locale
 import inspect
 from contextlib import contextmanager
 
 from .versioninfo import VersionInfo
-
-if sys.version_info >= (3, 3):
-    from subprocess import DEVNULL
-else:  # unreachable under 3.4+ - pragma: no cover
-    DEVNULL = open(os.devnull, 'wb')
 
 try:
     import pip
@@ -61,6 +52,13 @@ except ImportError:
 
 try:
     import pkg_resources
+except ImportError:
+    # this is used within try blocks; NBD if they fail
+    pass
+
+try:
+    from git import Repo
+    from git.db import GitDB
 except ImportError:
     # this is used within try blocks; NBD if they fail
     pass
@@ -280,38 +278,24 @@ class VersionFinder(object):
         :rtype: dict
         """
         res = {'remotes': None, 'tag': None, 'commit': None, 'dirty': None}
-        with chdir(gitdir):
-            res['commit'] = _get_git_commit()
-            if res['commit'] is not None:
-                res['tag'] = _get_git_tag(res['commit'])
-                res['remotes'] = _get_git_remotes()
-            try:
-                res['dirty'] = self._is_git_dirty()
-            except Exception:
-                pass
+        try:
+            logger.debug('opening %s as git.Repo', gitdir)
+            repo = Repo(path=gitdir, search_parent_directories=False)
+            res['commit'] = repo.head.commit.hexsha
+            res['dirty'] = repo.is_dirty(untracked_files=True)
+            res['remotes'] = {}
+            for rmt in repo.remotes:
+                # each is a git.Remote
+                urls = [u for u in rmt.urls]  # generator
+                if len(urls) > 0:
+                    res['remotes'][rmt.name] = urls[0]
+            for tag in repo.tags:
+                # each is a git.Tag object
+                if tag.commit.hexsha == res['commit']:
+                    res['tag'] = tag.name
+        except Exception:
+            logger.debug('Exception getting git information', exc_info=True)
         return res
-
-    def _is_git_dirty(self):
-        """
-        Determine if the git clone has uncommitted changes or is behind origin
-
-        :returns: True if clone is dirty, False otherwise
-        :rtype: bool
-        """
-        with chdir(self.package_dir):
-            status = _check_output([
-                'git',
-                'status',
-                '-u'
-            ], stderr=DEVNULL).strip()
-        logger.debug('git status: %s', status)
-        if (('Your branch is up-to-date with' not in status and
-                'HEAD detached at' not in status and
-                'Not currently on any branch' not in status) or
-                'nothing to commit' not in status):
-            logger.debug("Git repository dirty based on status: %s", status)
-            return True
-        return False
 
     @property
     def _package_top_dir(self):
@@ -330,105 +314,6 @@ class VersionFinder(object):
             if l is not None:
                 r.append(l)
         return sorted(list(set(r)))
-
-
-def _check_output(args, stderr=None):
-    """
-    Python version compatibility wrapper for subprocess.check_output
-
-    :param stderr: what to do with STDERR - None or an appropriate argument
-     to subprocess.check_output / subprocess.Popen
-    :raises: subprocess.CalledProcessError
-    :returns: command output
-    :rtype: string
-    """
-    if sys.version_info < (2, 7):
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr)
-        (res, err) = p.communicate()
-        if p.returncode != 0:
-            raise subprocess.CalledProcessError(p.returncode, args)
-    else:
-        res = subprocess.check_output(args, stderr=stderr)  # pragma: no cover
-        if sys.version_info >= (3, 0):
-            res = res.decode(locale.getdefaultlocale()[1])
-    return res
-
-
-def _get_git_commit():
-    """
-    Get the current (short) git commit hash of the current directory.
-
-    :returns: short git hash
-    :rtype: string
-    """
-    try:
-        commit = _check_output([
-            'git',
-            'rev-parse',
-            'HEAD'
-        ], stderr=DEVNULL).strip()
-        logger.debug("Found source git commit: %s", commit)
-    except Exception:
-        logger.debug("Unable to run git to get commit")
-        commit = None
-    return commit
-
-
-def _get_git_tag(commit):
-    """
-    Get the git tag for the specified commit, or None
-
-    :param commit: git commit hash to get the tag for
-    :type commit: string
-    :returns: tag name pointing to commit
-    :rtype: string
-    """
-    if commit is None:
-        return None
-    try:
-        tag = _check_output([
-            'git',
-            'describe',
-            '--exact-match',
-            '--tags',
-            commit
-        ], stderr=DEVNULL).strip()
-    except subprocess.CalledProcessError:
-        logger.debug('Exception caught')
-        tag = None
-    if tag == '':
-        logger.debug('tag output empty')
-        return None
-    return tag
-
-
-def _get_git_remotes():
-    """
-    Get a dict of name => value pairs for all git remotes configured on the
-    repository.
-
-    :returns: git remotes, name => value
-    :rtype: dict
-    """
-    urls = {}
-    try:
-        lines = _check_output([
-            'git',
-            'remote',
-            '-v'
-        ], stderr=DEVNULL).strip()
-        logger.debug('git remotes: %s' % lines)
-        lines = lines.split("\n")
-        for line in lines:
-            parts = re.split(r'\s+', line)
-            if parts[2] != '(fetch)':
-                continue
-            urls[parts[0]] = parts[1]
-    except subprocess.CalledProcessError:
-        logger.debug('CalledProcessError listing git remotes')
-    except IndexError:
-        logger.debug('IndexError getting git remotes', exc_info=True)
-    return urls
 
 
 @contextmanager

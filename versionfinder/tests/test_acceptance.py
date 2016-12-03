@@ -47,13 +47,19 @@ import sys
 import os
 import subprocess
 import json
-import requests
 import inspect
+import locale
 import backoff
+import requests
 from tempfile import mkdtemp
 from contextlib import contextmanager
 
-from versionfinder.versionfinder import (_get_git_commit, _check_output, chdir)
+if sys.version_info >= (3, 3):
+    from subprocess import DEVNULL
+else:  # unreachable under 3.4+ - pragma: no cover
+    DEVNULL = open(os.devnull, 'wb')
+
+from versionfinder.versionfinder import chdir
 
 import logging
 logger = logging.getLogger(__name__)
@@ -93,6 +99,48 @@ def setup_module(module):
         TEST_EGG_PATH = get_package(TEST_EGG_FMT % pyver)
     else:
         print("'%s' not in TEST_EGG_VERSIONS" % pyver)
+
+
+def _get_git_commit():
+    """
+    Get the current (short) git commit hash of the current directory.
+
+    :returns: short git hash
+    :rtype: string
+    """
+    try:
+        commit = _check_output([
+            'git',
+            'rev-parse',
+            'HEAD'
+        ], stderr=DEVNULL).strip()
+        logger.debug("Found source git commit: %s", commit)
+    except Exception:
+        logger.debug("Unable to run git to get commit")
+        commit = None
+    return commit
+
+
+def _check_output(args, stderr=None):
+    """
+    Python version compatibility wrapper for subprocess.check_output
+
+    :param stderr: what to do with STDERR - None or an appropriate argument
+     to subprocess.check_output / subprocess.Popen
+    :raises: subprocess.CalledProcessError
+    :returns: command output
+    :rtype: string
+    """
+    if sys.version_info < (2, 7):
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr)
+        (res, err) = p.communicate()
+        if p.returncode != 0:
+            raise subprocess.CalledProcessError(p.returncode, args)
+    else:
+        res = subprocess.check_output(args, stderr=stderr)  # pragma: no cover
+        if sys.version_info >= (3, 0):
+            res = res.decode(locale.getdefaultlocale()[1])
+    return res
 
 
 @contextmanager
@@ -524,31 +572,25 @@ class TestPip(AcceptanceHelpers):
     def test_install_local_e_tag(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        test_src = self._git_clone_test()
+        test_src = self._git_clone_test(ref=TEST_TAG_COMMIT)
         with capsys_disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._pip_install(path, ['-e', test_src])
-        fpath = os.path.join(test_src, 'versionfinder_test_pkg', 'foo.py')
-        print("Creating junk file at %s" % fpath)
-        with open(fpath, 'w') as fh:
-            fh.write("testing")
-        commit = self._git_add_commit(test_src, 'versioncheck tag')
-        self._set_git_tag(test_src, 'versioncheck')
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
             'result': {
-                'git_commit': commit,
-                'git_tag': 'versioncheck',
+                'git_commit': TEST_TAG_COMMIT,
+                'git_tag': TEST_TAG,
                 'git_remotes': {
                     'origin': TEST_GIT_HTTPS_URL,
                 },
-                'git_is_dirty': True,
+                'git_is_dirty': False,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
                 'pip_requirement': 'git+%s@%s#egg=versionfinder_test_pkg' % (
-                    TEST_GIT_HTTPS_URL, commit
+                    TEST_GIT_HTTPS_URL, TEST_TAG_COMMIT
                 ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,

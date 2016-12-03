@@ -43,10 +43,7 @@ import subprocess
 from textwrap import dedent
 from pip._vendor.packaging.version import Version
 
-from versionfinder.versionfinder import (
-    _get_git_commit, _get_git_remotes, _get_git_tag, _check_output, DEVNULL,
-    VersionFinder, chdir
-)
+from versionfinder.versionfinder import (VersionFinder, chdir)
 from versionfinder.versioninfo import VersionInfo
 
 import logging

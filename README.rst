@@ -30,11 +30,10 @@ Python package to find the version of another package/distribution, whether inst
 Overview
 --------
 
-versionfinder is a library intended to identify the version details of a specified Python
-distribution, whether it was installed via pip, setuptools or git. In most cases, the
-package to be identified will be the caller of versionfinder. This is intended to
-allow packages to determine what version they are, beyond what is simply coded
-in the package:
+versionfinder is a library intended to identify the version/source details of a
+specified Python distribution (usually the one calling it), whether it was
+installed via pip, setuptools or git. This is intended to allow packages to
+determine what version they are, beyond what is simply coded in the package:
 
 * For packages installed via pip, return the exact requirement that was installed,
   even if it was a source control URL (editable or not).
@@ -55,7 +54,48 @@ Requirements
 Usage
 -----
 
-@TODO
+Versionfinder is primarily intended to return information about the package/
+distribution it is called from. As some operations can be quite a bit more time
+consuming than simply reading a ``pkg_resources`` or ``pip`` distribution version,
+it's recommended that Versionfinder be run once during the startup or initialization
+of your application/process, and the result stored for later use.
+
+The simplest example is finding the version information for whatever package/distribution
+contains the calling module. In ``mymodule.py``, a module within the "mypackage"
+package/distribution:
+
+.. code-block:: python
+
+    import logging
+    from versionfinder import find_version
+
+    # If you are using the python logging module, you'll likely want to
+    # suppress logging from versionfinder itself, as well as the DEBUG-level
+    # logging from ``pip`` and ``git``, which are called by versionfinder.
+    for lname in ['versionfinder', 'pip', 'git']:
+        l = logging.getLogger(lname)
+        l.setLevel(logging.CRITICAL)
+        l.propagate = True
+
+    class MyClass(object):
+
+        def __init__(self):
+            self._versioninfo = find_version('mypackage')
+
+        @property
+        def versioninfo(self):
+            return self._versioninfo
+
+The ``_versioninfo`` attribute of the class will be set to the ``VersionInfo``
+object returned by ``find_version()``. We can inspect some of that object's
+properties, which are documented in the `API docs <>`_.
+
+.. code-block:: pycon
+
+    > from mypackage.mymodule import MyClass
+    > c = MyClass()
+    > verinfo = c.versioninfo
+
 
 Bugs and Feature Requests
 -------------------------
