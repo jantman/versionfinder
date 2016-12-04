@@ -79,7 +79,7 @@ def mockrepo(commit=None, dirty=False, remotes={}, tag=None):
         tags.append(tag2)
     m.tags = tags
     rmts = []
-    for name, url in remotes.iteritems():
+    for name, url in remotes.items():
         rmt = MagicMock()
         rmt.name = name
         if isinstance(url, type([])):
