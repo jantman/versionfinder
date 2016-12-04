@@ -49,7 +49,8 @@ tag or commit from a git repo, or has local changes not committed to git.
 Requirements
 ------------
 
-* Python 2.6, 2.7, or Python 3.3+. Python 3.0-3.2 is not supported.
+* Python 2.7, or Python 3.3+. Python 3.0-3.2 is not supported. Python 2.6 should
+  function, but will not return detailed git information and is not tested.
 
 Usage
 -----
