@@ -94,10 +94,41 @@ properties, which are documented in the
 
 .. code-block:: pycon
 
-    > from mypackage.mymodule import MyClass
-    > c = MyClass()
-    > verinfo = c.versioninfo
-
+    >>> from mypackage.mymodule import MyClass
+    >>> c = MyClass()
+    >>> v = c.versioninfo
+    >>> v
+    VersionInfo(git_commit=123456ab, git_is_dirty=True, git_remotes={'origin': 'https://github.com/someone/foo.git'}, git_tag=v1.2.3, pip_requirement=git+https://github.com/someone/foo@v1.2.3#egg=foo, pip_url=http://foo.com, pip_version=1.2.3, pkg_resources_url=http://foo.com, pkg_resources_version=1.2.3)
+    >>> v.pip_version
+    '1.2.3'
+    >>> v.pkg_resources_version
+    '1.2.3'
+    >>> v.version
+    '1.2.3'
+    >>> v.pip_url
+    'http://foo.com'
+    >>> v.pkg_resources_url
+    'http://foo.com'
+    >>> v.url
+    'http://foo.com'
+    >>> v.pip_requirement
+    'git+https://github.com/someone/foo@v1.2.3#egg=foo'
+    >>> v.git_remotes
+    {'origin': 'https://github.com/someone/foo.git'}
+    >>> v.git_remote
+    'https://github.com/someone/foo.git'
+    >>> v.git_commit
+    '123456ab'
+    >>> v.git_tag
+    'v1.2.3'
+    >>> v.git_is_dirty
+    True
+    >>> v.git_str
+    'git+https://github.com/someone/foo@v1.2.3#egg=foo*'
+    >>> v.short_str
+    '1.2.3 <http://foo.com>'
+    >>> v.long_str
+    '1.2.3 <http://foo.com> (git+https://github.com/someone/foo@v1.2.3#egg=foo*)'
 
 Bugs and Feature Requests
 -------------------------
