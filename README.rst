@@ -89,7 +89,8 @@ package/distribution:
 
 The ``_versioninfo`` attribute of the class will be set to the ``VersionInfo``
 object returned by ``find_version()``. We can inspect some of that object's
-properties, which are documented in the `API docs <>`_.
+properties, which are documented in the
+`API docs <http://versionfinder.readthedocs.io/en/latest/versionfinder.versioninfo.html#versionfinder.versioninfo.VersionInfo>`_.
 
 .. code-block:: pycon
 
