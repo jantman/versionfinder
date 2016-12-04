@@ -137,6 +137,17 @@ class VersionInfo(object):
         return self._pip_url
 
     @property
+    def pip_requirement(self):
+        """
+        Return the pip requirement for the current installation of the
+        distribution, or None if the distribution cannot be found with pip.
+
+        :return: pip requirement string
+        :rtype: :py:obj:`str` or :py:data:`None`
+        """
+        return self._pip_requirement
+
+    @property
     def pkg_resources_version(self):
         """
         Return the pkg_resources distribution version, or None if the

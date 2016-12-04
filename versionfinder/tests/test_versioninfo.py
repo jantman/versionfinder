@@ -152,7 +152,7 @@ class TestProperties(object):
         assert self.cls.pip_url == 'pipurl'
 
     def test_pip_requirement(self):
-        assert self.cls._pip_requirement == 'preq'
+        assert self.cls.pip_requirement == 'preq'
 
     def test_pkg_resources_version(self):
         assert self.cls.pkg_resources_version == 'prver'
