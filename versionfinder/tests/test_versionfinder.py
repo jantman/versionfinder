@@ -39,9 +39,8 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 
 import pytest
 import sys
-import subprocess
-from textwrap import dedent
 from pip._vendor.packaging.version import Version
+from git import Repo
 
 from versionfinder.versionfinder import (VersionFinder, chdir)
 from versionfinder.versioninfo import VersionInfo
@@ -55,12 +54,41 @@ if (
         sys.version_info[0] < 3 or
         sys.version_info[0] == 3 and sys.version_info[1] < 4
 ):
-    from mock import patch, call, DEFAULT, Mock, PropertyMock
+    from mock import patch, call, DEFAULT, Mock, PropertyMock, MagicMock
 else:
-    from unittest.mock import patch, call, DEFAULT, Mock, PropertyMock
+    from unittest.mock import (
+        patch, call, DEFAULT, Mock, PropertyMock, MagicMock)
 
 pbm = 'versionfinder.versionfinder'
 pb = '%s.VersionFinder' % pbm
+
+
+def mockrepo(commit=None, dirty=False, remotes={}, tag=None):
+    """return a mock Repo"""
+    m = MagicMock(spec_set=Repo)
+    m.is_dirty.return_value = dirty
+    m.head.commit.hexsha = commit
+    tag1 = MagicMock()
+    tag1.name = 'wrongTagName'
+    tag1.commit.hexsha = '1234'
+    tags = [tag1]
+    if tag is not None:
+        tag2 = MagicMock()
+        tag2.name = tag
+        tag2.commit.hexsha = commit
+        tags.append(tag2)
+    m.tags = tags
+    rmts = []
+    for name, url in remotes.iteritems():
+        rmt = MagicMock()
+        rmt.name = name
+        if isinstance(url, type([])):
+            rmt.urls = url
+        else:
+            rmt.urls = [url]
+        rmts.append(rmt)
+    m.remotes = rmts
+    return m
 
 
 class BaseTest(object):
@@ -476,140 +504,6 @@ class TestFindPackageVersion(BaseTest):
         assert mock_is_git.mock_calls == [call()]
 
 
-class TestIsGitDirty(BaseTest):
-
-    def test_is_git_dirty_false(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            with patch('%s.chdir' % pbm) as mock_chdir:
-                mock_check_out.return_value = dedent("""
-                On branch current_module
-                Your branch is up-to-date with 'origin/current_module'.
-                nothing to commit, working directory clean
-                """)
-                res = self.cls._is_git_dirty()
-        assert res is False
-        assert mock_chdir.mock_calls == [
-            call('/foo/bar'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
-        assert mock_check_out.mock_calls == [
-            call(['git', 'status', '-u'], stderr=DEVNULL)
-        ]
-
-    def test_is_git_dirty_false_detatched(self):
-        with patch('%s.chdir' % pbm) as mock_chdir:
-            with patch('%s._check_output' % pbm) as mock_check_out:
-                mock_check_out.return_value = dedent("""
-                HEAD detached at 9247d43
-                nothing to commit, working directory clean
-                """)
-                res = self.cls._is_git_dirty()
-        assert res is False
-        assert mock_chdir.mock_calls == [
-            call('/foo/bar'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
-        assert mock_check_out.mock_calls == [
-            call(['git', 'status', '-u'], stderr=DEVNULL)
-        ]
-
-    def test_is_git_dirty_false_no_branch(self):
-        with patch('%s.chdir' % pbm) as mock_chdir:
-            with patch('%s._check_output' % pbm) as mock_check_out:
-                mock_check_out.return_value = dedent("""
-                Not currently on any branch.
-                nothing to commit, working directory clean
-                """)
-                res = self.cls._is_git_dirty()
-        assert res is False
-        assert mock_chdir.mock_calls == [
-            call('/foo/bar'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
-        assert mock_check_out.mock_calls == [
-            call(['git', 'status', '-u'], stderr=DEVNULL)
-        ]
-
-    def test_is_git_dirty_true_ahead(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = dedent("""
-            On branch issues/8
-            Your branch is ahead of 'origin/issues/8' by 1 commit.
-              (use "git push" to publish your local commits)
-            Changes not staged for commit:
-              (use "git add <file>..." to update what will be committed)
-              (use "git checkout -- <file>..." to discard changes in )
-
-                    modified:   awslimitchecker/tests/test_versioncheck.py
-                    modified:   awslimitchecker/versioncheck.py
-
-            no changes added to commit (use "git add" and/or "git commit -a")
-            """)
-            with patch('%s.chdir' % pbm) as mock_chdir:
-                res = self.cls._is_git_dirty()
-        assert res is True
-        assert mock_chdir.mock_calls == [
-            call('/foo/bar'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
-        assert mock_check_out.mock_calls == [
-            call(['git', 'status', '-u'], stderr=DEVNULL)
-        ]
-
-    def test_is_git_dirty_true_detatched(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = dedent("""
-            HEAD detached at 9247d43
-            Untracked files:
-              (use "git add <file>..." to include in what will be committed)
-
-                    foo
-
-            nothing added to commit but untracked files present
-            """)
-            with patch('%s.chdir' % pbm) as mock_chdir:
-                res = self.cls._is_git_dirty()
-        assert res is True
-        assert mock_chdir.mock_calls == [
-            call('/foo/bar'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
-        assert mock_check_out.mock_calls == [
-            call(['git', 'status', '-u'], stderr=DEVNULL)
-        ]
-
-    def test_is_git_dirty_true_changes(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = dedent("""
-            On branch issues/8
-            Your branch is up-to-date with 'origin/issues/8'.
-            Changes not staged for commit:
-              (use "git add <file>..." to update what will be committed)
-              (use "git checkout -- <file>..." to discard changes in working
-
-                    modified:   awslimitchecker/tests/test_versioncheck.py
-                    modified:   awslimitchecker/versioncheck.py
-
-            no changes added to commit (use "git add" and/or "git commit -a")
-            """)
-            with patch('%s.chdir' % pbm) as mock_chdir:
-                res = self.cls._is_git_dirty()
-        assert res is True
-        assert mock_chdir.mock_calls == [
-            call('/foo/bar'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
-        assert mock_check_out.mock_calls == [
-            call(['git', 'status', '-u'], stderr=DEVNULL)
-        ]
-
-
 class TestGitRepoPath(BaseTest):
 
     def test_true(self):
@@ -649,84 +543,49 @@ class TestGitRepoPath(BaseTest):
 class TestFindGitInfo(BaseTest):
 
     def test_find(self):
-        # this is a horribly ugly way to get this to work on py26-py34
-        mocks = {}
-        with patch.multiple(
-            pbm,
-            _get_git_commit=DEFAULT,
-            _get_git_tag=DEFAULT,
-            _get_git_remotes=DEFAULT,
-            chdir=DEFAULT,
-        ) as mocks1:
-            mocks.update(mocks1)
-            with patch.multiple(
-                pb,
-                _is_git_dirty=DEFAULT,
-            ) as mocks2:
-                mocks.update(mocks2)
-                mocks['_get_git_commit'].return_value = '12345678'
-                mocks['_get_git_tag'].return_value = 'mytag'
-                mocks['_get_git_remotes'].return_value = {
-                    'origin': 'http://my.git/url'
-                }
-                mocks['_is_git_dirty'].return_value = False
-                res = self.cls._find_git_info('/git/repo/.git')
-        assert mocks['_get_git_commit'].mock_calls == [call()]
-        assert mocks['_get_git_tag'].mock_calls == [call('12345678')]
-        assert mocks['_get_git_remotes'].mock_calls == [call()]
-        assert mocks['_is_git_dirty'].mock_calls == [call()]
-        assert mocks['chdir'].mock_calls == [
-            call('/git/repo/.git'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
+        with patch('%s.Repo' % pbm, autospec=True) as mock_repo:
+            mock_repo.return_value = mockrepo(
+                commit='12345678',
+                dirty=False,
+                remotes={
+                    'origin': 'http://my.git/url',
+                    'upstream': ['git@github.com:/foo/bar', 'bar'],
+                    'foo': [],
+                },
+                tag='mytag'
+            )
+            res = self.cls._find_git_info('/git/repo/.git')
         assert res == {
             'commit': '12345678',
             'dirty': False,
             'tag': 'mytag',
-            'remotes': {'origin': 'http://my.git/url'}
+            'remotes': {
+                'origin': 'http://my.git/url',
+                'upstream': 'git@github.com:/foo/bar'
+            }
         }
+        assert mock_repo.mock_calls == [
+            call(path='/git/repo/.git', search_parent_directories=False),
+            call().is_dirty(untracked_files=True)
+        ]
 
     def test_no_git(self):
 
         def se_exc():
             raise Exception("foo")
 
-        # this is a horribly ugly way to get this to work on py26-py34
-        mocks = {}
-        with patch.multiple(
-            pbm,
-            _get_git_commit=DEFAULT,
-            _get_git_tag=DEFAULT,
-            _get_git_remotes=DEFAULT,
-            chdir=DEFAULT,
-        ) as mocks1:
-            mocks.update(mocks1)
-            with patch.multiple(
-                pb,
-                _is_git_dirty=DEFAULT,
-            ) as mocks2:
-                mocks.update(mocks2)
-                mocks['_get_git_commit'].return_value = None
-                mocks['_get_git_tag'].return_value = 'mytag'
-                mocks['_get_git_remotes'].return_value = 'http://my.git/url'
-                mocks['_is_git_dirty'].side_effect = se_exc
-                res = self.cls._find_git_info('/git/repo/.git')
-        assert mocks['_get_git_commit'].mock_calls == [call()]
-        assert mocks['_get_git_tag'].mock_calls == []
-        assert mocks['_get_git_remotes'].mock_calls == []
-        assert mocks['_is_git_dirty'].mock_calls == [call()]
-        assert mocks['chdir'].mock_calls == [
-            call('/git/repo/.git'),
-            call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
+        with patch('%s.Repo' % pbm, autospec=True) as mock_repo:
+            mock_repo.side_effect = se_exc
+            res = self.cls._find_git_info('/git/repo/.git')
         assert res == {
             'commit': None,
             'tag': None,
             'remotes': None,
             'dirty': None,
         }
+        assert mock_repo.mock_calls == [
+            call(path='/git/repo/.git', search_parent_directories=False)
+        ]
 
 
 class TestGetDistVersionUrl(BaseTest):
@@ -956,177 +815,6 @@ class TestFindPkgInfo(BaseTest):
         assert res == {'version': '7.8.9', 'url': 'http://foobar'}
 
 
-class TestGetGitRemotes(object):
-
-    def test_simple(self):
-        cmd_out = '' \
-                "origin  git@github.com:jantman/awslimitchecker.git (fetch)\n" \
-                "origin  git@github.com:jantman/awslimitchecker.git (push)\n"
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = cmd_out
-            res = _get_git_remotes()
-        assert res == {
-            'origin': 'git@github.com:jantman/awslimitchecker.git'
-        }
-        assert mock_check_out.mock_calls == [
-            call(['git', 'remote', '-v'], stderr=DEVNULL)
-        ]
-
-    def test_fork(self):
-        cmd_out = "origin  git@github.com:someone/awslimitchecker.git (fetch" \
-                  ")\n" \
-                  "origin  git@github.com:someone/awslimitchecker.git (push)" \
-                  "\n" \
-                  "upstream        https://github.com/jantman/awslimitchecke" \
-                  "r.git (fetch)\n" \
-                  "upstream        https://github.com/jantman/awslimitchecker" \
-                  ".git (push)\n"
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = cmd_out
-            res = _get_git_remotes()
-        assert res == {
-            'origin': 'git@github.com:someone/awslimitchecker.git',
-            'upstream': 'https://github.com/jantman/awslimitchecker.git'
-        }
-        assert mock_check_out.mock_calls == [
-            call(['git', 'remote', '-v'], stderr=DEVNULL)
-        ]
-
-    def test_no_origin(self):
-        cmd_out = "mine  git@github.com:someone/awslimitchecker.git (fetch" \
-                  ")\n" \
-                  "mine  git@github.com:someone/awslimitchecker.git (push)" \
-                  "\n" \
-                  "upstream        https://github.com/jantman/awslimitchecke" \
-                  "r.git (fetch)\n" \
-                  "upstream        https://github.com/jantman/awslimitchecker" \
-                  ".git (push)\n" \
-                  "another        https://github.com/foo/awslimitchecke" \
-                  "r.git (fetch)\n" \
-                  "another        https://github.com/foo/awslimitchecker" \
-                  ".git (push)\n"
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = cmd_out
-            res = _get_git_remotes()
-        assert res == {
-            'another': 'https://github.com/foo/awslimitchecker.git',
-            'upstream': 'https://github.com/jantman/awslimitchecker.git',
-            'mine': 'git@github.com:someone/awslimitchecker.git'
-        }
-        assert mock_check_out.mock_calls == [
-            call(['git', 'remote', '-v'], stderr=DEVNULL)
-        ]
-
-    def test_exception(self):
-
-        def se(foo, stderr=None):
-            raise subprocess.CalledProcessError(3, 'mycommand')
-
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.side_effect = se
-            res = _get_git_remotes()
-        assert res == {}
-        assert mock_check_out.mock_calls == [
-            call(['git', 'remote', '-v'], stderr=DEVNULL)
-        ]
-
-    def test_none(self):
-        cmd_out = ''
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = cmd_out
-            res = _get_git_remotes()
-        assert res == {}
-        assert mock_check_out.mock_calls == [
-            call(['git', 'remote', '-v'], stderr=DEVNULL)
-        ]
-
-    def test_no_fetch(self):
-        cmd_out = "mine  git@github.com:someone/awslimitchecker.git (push)" \
-                  "\n" \
-                  "upstream        https://github.com/jantman/awslimitchecker" \
-                  ".git (push)\n" \
-                  "another        https://github.com/jantman/awslimitchecker" \
-                  ".git (push)\n"
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = cmd_out
-            res = _get_git_remotes()
-        assert res == {}
-        assert mock_check_out.mock_calls == [
-            call(['git', 'remote', '-v'], stderr=DEVNULL)
-        ]
-
-
-class TestGetGitTag(object):
-
-    def test_get(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = 'mytag'
-            res = _get_git_tag('abcd')
-        assert res == 'mytag'
-        assert mock_check_out.mock_calls == [
-            call(['git', 'describe', '--exact-match', '--tags', 'abcd'],
-                 stderr=DEVNULL)
-        ]
-
-    def test_commit_none(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = 'mytag'
-            res = _get_git_tag(None)
-        assert res is None
-        assert mock_check_out.mock_calls == []
-
-    def test_no_tags(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = ''
-            res = _get_git_tag('abcd')
-        assert res is None
-        assert mock_check_out.mock_calls == [
-            call(['git', 'describe', '--exact-match', '--tags', 'abcd'],
-                 stderr=DEVNULL)
-        ]
-
-    def test_exception(self):
-
-        def se(foo, stderr=None):
-            raise subprocess.CalledProcessError(3, 'mycommand')
-
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.side_effect = se
-            res = _get_git_tag('abcd')
-        assert res is None
-        assert mock_check_out.mock_calls == [
-            call(['git', 'describe', '--exact-match', '--tags', 'abcd'],
-                 stderr=DEVNULL)
-        ]
-
-
-class TestGetGitCommit(object):
-
-    def test_get(self):
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = '1234abcd'
-            res = _get_git_commit()
-        assert res == '1234abcd'
-        assert mock_check_out.mock_calls == [
-            call(['git', 'rev-parse', 'HEAD'],
-                 stderr=DEVNULL)
-        ]
-
-    def test_exception(self):
-
-        def se(foo):
-            raise subprocess.CalledProcessError(3, 'mycommand')
-
-        with patch('%s._check_output' % pbm) as mock_check_out:
-            mock_check_out.side_effect = se
-            res = _get_git_commit()
-        assert res is None
-        assert mock_check_out.mock_calls == [
-            call(['git', 'rev-parse', 'HEAD'],
-                 stderr=DEVNULL)
-        ]
-
-
 class TestPackageTopDir(BaseTest):
 
     def test_none(self):
@@ -1152,97 +840,6 @@ class TestPackageTopDir(BaseTest):
         self.cls._pip_locations = ['/bar', None]
         self.cls._pkg_resources_locations = ['/baz', None]
         assert self.cls._package_top_dir == ['/bar', '/baz', '/foo']
-
-
-class TestCheckOutput(object):
-
-    @pytest.mark.skipif(
-        (
-                sys.version_info[0] != 2 or
-                (sys.version_info[0] == 2 and sys.version_info[1] != 6)
-        ),
-        reason='not running py26 test on %d.%d.%d' % (
-                sys.version_info[0],
-                sys.version_info[1],
-                sys.version_info[2]
-        ))
-    def test_py26(self):
-        mock_p = Mock(returncode=0)
-        mock_p.communicate.return_value = ('foo', 'bar')
-        with patch('%s.subprocess.Popen' % pbm) as mock_popen:
-            mock_popen.return_value = mock_p
-            res = _check_output(['mycmd'], stderr='something')
-        assert res == 'foo'
-        assert mock_popen.mock_calls == [
-            call(
-                ['mycmd'],
-                stderr='something',
-                stdout=subprocess.PIPE
-            ),
-            call().communicate()
-        ]
-
-    @pytest.mark.skipif(
-        (
-                sys.version_info[0] != 2 or
-                (sys.version_info[0] == 2 and sys.version_info[1] != 6)
-        ),
-        reason='not running py26 test on %d.%d.%d' % (
-                sys.version_info[0],
-                sys.version_info[1],
-                sys.version_info[2]
-        ))
-    def test_py26_exception(self):
-        mock_p = Mock(returncode=2)
-        mock_p.communicate.return_value = ('foo', 'bar')
-        with patch('%s.subprocess.Popen' % pbm) as mock_popen:
-            mock_popen.return_value = mock_p
-            with pytest.raises(subprocess.CalledProcessError) as exc:
-                _check_output(['mycmd'], stderr='something')
-        assert mock_popen.mock_calls == [
-            call(
-                ['mycmd'],
-                stderr='something',
-                stdout=subprocess.PIPE
-            ),
-            call().communicate()
-        ]
-        assert exc.value.cmd == ['mycmd']
-        assert exc.value.returncode == 2
-
-    @pytest.mark.skipif(
-        (
-                sys.version_info[0] != 2 or
-                (sys.version_info[0] == 2 and sys.version_info[1] != 7)
-        ),
-        reason='not running py27 test on %d.%d.%d' % (
-                sys.version_info[0],
-                sys.version_info[1],
-                sys.version_info[2]
-        ))
-    def test_py27(self):
-        with patch('%s.subprocess.check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = 'foobar'
-            res = _check_output(['foo', 'bar'], stderr='something')
-        assert res == 'foobar'
-        assert mock_check_out.mock_calls == [
-            call(['foo', 'bar'], stderr='something')
-        ]
-
-    @pytest.mark.skipif(sys.version_info[0] < 3,
-                        reason='not running py3 test on %d.%d.%d' % (
-                            sys.version_info[0],
-                            sys.version_info[1],
-                            sys.version_info[2]
-                        ))
-    def test_py3(self):
-        with patch('%s.subprocess.check_output' % pbm) as mock_check_out:
-            mock_check_out.return_value = 'foobar'.encode('utf-8')
-            res = _check_output(['foo', 'bar'], stderr='something')
-        assert res == 'foobar'
-        assert mock_check_out.mock_calls == [
-            call(['foo', 'bar'], stderr='something')
-        ]
 
 
 class TestChdir(object):

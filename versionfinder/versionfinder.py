@@ -58,7 +58,6 @@ except ImportError:
 
 try:
     from git import Repo
-    from git.db import GitDB
 except ImportError:
     # this is used within try blocks; NBD if they fail
     pass
