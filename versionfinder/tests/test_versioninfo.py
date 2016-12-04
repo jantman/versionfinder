@@ -37,7 +37,20 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
+import sys
 from versionfinder.versioninfo import VersionInfo
+
+# https://code.google.com/p/mock/issues/detail?id=249
+# py>=3.4 should use unittest.mock not the mock package on pypi
+if (
+        sys.version_info[0] < 3 or
+        sys.version_info[0] == 3 and sys.version_info[1] < 4
+):
+    from mock import patch, PropertyMock
+else:
+    from unittest.mock import patch, PropertyMock
+
+pb = 'versionfinder.versioninfo.VersionInfo'
 
 
 class TestInit(object):
@@ -99,6 +112,139 @@ class TestAsDict(object):
         }
         v = VersionInfo(**d)
         assert v.as_dict == d
+
+
+class TestProperties(object):
+
+    def setup_method(self, _):
+        self.cls = VersionInfo(
+            pip_version='pipver',
+            pip_url='pipurl',
+            pip_requirement='preq',
+            pkg_resources_version='prver',
+            pkg_resources_url='prurl',
+            git_tag='tag',
+            git_commit='commit',
+            git_remotes={
+                'origin': 'ourl'
+            },
+            git_is_dirty=True
+        )
+
+    def test_version(self):
+        assert self.cls.version == 'pipver'
+
+    def test_version_no_pip(self):
+        self.cls._pip_version = None
+        assert self.cls.version == 'prver'
+
+    def test_url(self):
+        assert self.cls.url == 'pipurl'
+
+    def test_url_no_pip(self):
+        self.cls._pip_url = None
+        assert self.cls.url == 'prurl'
+
+    def test_pip_version(self):
+        assert self.cls.pip_version == 'pipver'
+
+    def test_pip_url(self):
+        assert self.cls.pip_url == 'pipurl'
+
+    def test_pip_requirement(self):
+        assert self.cls._pip_requirement == 'preq'
+
+    def test_pkg_resources_version(self):
+        assert self.cls.pkg_resources_version == 'prver'
+
+    def test_pkg_resources_url(self):
+        assert self.cls.pkg_resources_url == 'prurl'
+
+    def test_git_tag(self):
+        assert self.cls.git_tag == 'tag'
+
+    def test_git_commit(self):
+        assert self.cls.git_commit == 'commit'
+
+    def test_git_remotes(self):
+        assert self.cls.git_remotes == {
+            'origin': 'ourl'
+        }
+
+    def test_git_remote(self):
+        assert self.cls.git_remote == 'ourl'
+
+    def test_git_remote_none(self):
+        self.cls._git_remotes = None
+        assert self.cls.git_remote is None
+
+    def test_git_remote_no_origin(self):
+        self.cls._git_remotes = {
+            'a': 'rmta',
+            'k': 'rmtk',
+            'z': 'rmtz'
+        }
+        assert self.cls.git_remote == 'rmta'
+
+    def test_git_is_dirty(self):
+        assert self.cls.git_is_dirty is True
+
+    def test_git_str(self):
+        assert self.cls.git_str == 'ourl@tag*'
+
+    def test_git_str_no_git(self):
+        self.cls._git_commit = None
+        self.cls._git_remotes = None
+        assert self.cls.git_str == ''
+
+    def test_git_str_no_tag(self):
+        self.cls._git_tag = None
+        assert self.cls.git_str == 'ourl@commit*'
+
+    def test_git_str_not_dirty(self):
+        self.cls._git_is_dirty = False
+        assert self.cls.git_str == 'ourl@tag'
+
+    def test_git_str_pip_req_not_dirty(self):
+        self.cls._git_is_dirty = False
+        self.cls._pip_requirement = 'git+https://foo'
+        assert self.cls.git_str == 'git+https://foo'
+
+    def test_git_str_pip_req_dirty(self):
+        self.cls._pip_requirement = 'git+https://foo'
+        assert self.cls.git_str == 'git+https://foo*'
+
+    def test_short_str_pip(self):
+        assert self.cls.short_str == 'pipver <pipurl>'
+
+    def test_short_str_pkg_resources(self):
+        self.cls._pip_version = None
+        self.cls._pip_url = None
+        assert self.cls.short_str == 'prver <prurl>'
+
+    def test_short_str_none(self):
+        with patch('%s.version' % pb, new_callable=PropertyMock) as m_ver:
+            with patch('%s.url' % pb, new_callable=PropertyMock) as m_url:
+                m_ver.return_value = None
+                m_url.return_value = None
+                assert self.cls.short_str == ''
+
+    def test_long_str_git(self):
+        self.cls._git_is_dirty = False
+        with patch('%s.git_str' % pb, new_callable=PropertyMock) as m_git_str:
+            with patch('%s.short_str' % pb,
+                       new_callable=PropertyMock) as m_short:
+                m_git_str.return_value = 'gitstr'
+                m_short.return_value = 'shortstr'
+                assert self.cls.long_str == 'shortstr (gitstr)'
+
+    def test_long_str_no_git(self):
+        with patch('%s.git_str' % pb, new_callable=PropertyMock) as m_git_str:
+            with patch('%s.short_str' % pb,
+                       new_callable=PropertyMock) as m_short:
+                m_git_str.return_value = ''
+                m_short.return_value = 'shortstr'
+                assert self.cls.long_str == 'shortstr'
 
 
 class TestRepr(object):
