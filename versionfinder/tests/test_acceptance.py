@@ -714,6 +714,10 @@ class TestPip(AcceptanceHelpers):
         }
         assert actual == expected
 
+    @pytest.mark.skipif(
+        sys.version_info[0:2] >= (3, 6),
+        reason='pip 1.5.4 does not work on py >= 3.6'
+    )
     def test_install_sdist_pip154(self, capsys, tmpdir):
         """regression test for issue #55"""
         path = str(tmpdir)
