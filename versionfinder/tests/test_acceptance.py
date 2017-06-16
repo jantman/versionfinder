@@ -120,7 +120,7 @@ def _get_git_commit():
     return commit
 
 
-def _check_output(args, stderr=None):
+def _check_output(args, stderr=None, env=None):
     """
     Python version compatibility wrapper for subprocess.check_output
 
@@ -130,15 +130,13 @@ def _check_output(args, stderr=None):
     :returns: command output
     :rtype: string
     """
-    if sys.version_info < (2, 7):
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr)
-        (res, err) = p.communicate()
-        if p.returncode != 0:
-            raise subprocess.CalledProcessError(p.returncode, args)
-    else:
-        res = subprocess.check_output(args, stderr=stderr)  # pragma: no cover
-        if sys.version_info >= (3, 0):
-            res = res.decode(locale.getdefaultlocale()[1])
+    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr, env=env)
+    (res, err) = p.communicate()
+    if p.returncode != 0:
+        print("Command %s OUT/ERR:\n%s", args, res)
+        raise subprocess.CalledProcessError(p.returncode, args)
+    if not isinstance(res, type("")):
+        res = res.decode('utf-8')
     return res
 
 
@@ -396,7 +394,7 @@ class AcceptanceHelpers(object):
             print_header("git repository in %s commit: %s" % (path, commit))
         return commit
 
-    def _get_version(self, path):
+    def _get_version(self, path, env=None):
         """
         In the virtualenv at ``path``, run ``versionfinder-test`` and
         return the JSON-decoded output dict.
@@ -408,7 +406,7 @@ class AcceptanceHelpers(object):
         """
         args = [os.path.join(path, 'bin', 'versionfinder-test')]
         print_header("_get_version() running: " + ' '.join(args))
-        res = _check_output(args, stderr=subprocess.STDOUT)
+        res = _check_output(args, stderr=subprocess.STDOUT, env=env)
         print(res)
         print('DONE')
         j = json.loads(res.strip().split("\n")[-1])
@@ -752,6 +750,32 @@ class TestPip(AcceptanceHelpers):
                 inspect.stack()[0][0].f_code.co_name, path, TEST_WHEEL_PATH))
         self._pip_install(path, [TEST_WHEEL_PATH])
         actual = self._get_result(self._get_version(path))
+        expected = {
+            'failed': False,
+            'result': {
+                'git_commit': None,
+                'git_tag': None,
+                'git_remotes': None,
+                'git_is_dirty': None,
+                'pip_version': TEST_VERSION,
+                'pip_url': TEST_PROJECT_URL,
+                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pkg_resources_version': TEST_VERSION,
+                'pkg_resources_url': TEST_PROJECT_URL,
+            }
+        }
+        assert actual == expected
+
+    def test_install_bdist_wheel_no_git_binary(self, capsys, tmpdir):
+        e = {x: os.environ[x] for x in os.environ}
+        e['GIT_PYTHON_GIT_EXECUTABLE'] = '/tmp/NoSuchFile'
+        path = str(tmpdir)
+        self._make_venv(path)
+        with capsys_disabled(capsys):
+            print("\n%s() venv=%s src=%s" % (
+                inspect.stack()[0][0].f_code.co_name, path, TEST_WHEEL_PATH))
+        self._pip_install(path, [TEST_WHEEL_PATH])
+        actual = self._get_result(self._get_version(path, env=e))
         expected = {
             'failed': False,
             'result': {
