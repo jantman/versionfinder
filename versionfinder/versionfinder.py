@@ -58,7 +58,7 @@ except ImportError:
 
 try:
     from git import Repo
-except ImportError:
+except Exception:
     # this is used within try blocks; NBD if they fail
     pass
 
