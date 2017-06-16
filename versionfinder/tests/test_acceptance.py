@@ -48,7 +48,6 @@ import os
 import subprocess
 import json
 import inspect
-import locale
 import backoff
 import requests
 import logging
