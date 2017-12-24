@@ -53,7 +53,6 @@ import requests
 import logging
 from versionfinder.versionfinder import chdir
 from tempfile import mkdtemp
-from contextlib import contextmanager
 
 if sys.version_info >= (3, 3):
     from subprocess import DEVNULL
