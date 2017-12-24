@@ -139,23 +139,6 @@ def _check_output(args, stderr=None, env=None):
     return res
 
 
-@contextmanager
-def capsys_disabled(capsys):
-    """
-    Backport of pytest's ``capsys.disabled`` ContextManager to pytest versions
-    < 3.0. Allows us to print/write directly to stdout and stderr from within
-    tests.
-
-    :param capsys: pytest capsys fixture
-    """
-    capmanager = capsys.request.config.pluginmanager.getplugin('capturemanager')
-    capmanager.suspendcapture_item(capsys.request.node, "call", in_=True)
-    try:
-        yield
-    finally:
-        capmanager.resumecapture()
-
-
 class AcceptanceHelpers(object):
     """
     Long-running acceptance tests for VersionFinder.
@@ -482,7 +465,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._pip_install(path, [test_src])
@@ -507,7 +490,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._pip_install(path, ['-e', test_src])
@@ -536,7 +519,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._pip_install(path, ['-e', test_src])
@@ -569,7 +552,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test(ref=TEST_TAG_COMMIT)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._pip_install(path, ['-e', test_src])
@@ -598,7 +581,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._pip_install(path, ['-e', test_src])
@@ -628,7 +611,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._pip_install(path, ['-e', test_src])
@@ -658,7 +641,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._git_add_remote(test_src, 'testremote',
@@ -690,7 +673,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_sdist(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
         self._pip_install(path, [TEST_TARBALL_PATH])
@@ -719,7 +702,7 @@ class TestPip(AcceptanceHelpers):
         """regression test for issue #55"""
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
         self._pip_install(path, ['--force-reinstall', 'pip==1.5.4'])
@@ -744,7 +727,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_bdist_wheel(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_WHEEL_PATH))
         self._pip_install(path, [TEST_WHEEL_PATH])
@@ -770,7 +753,7 @@ class TestPip(AcceptanceHelpers):
         e['GIT_PYTHON_GIT_EXECUTABLE'] = '/tmp/NoSuchFile'
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_WHEEL_PATH))
         self._pip_install(path, [TEST_WHEEL_PATH])
@@ -794,7 +777,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -822,7 +805,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_fork(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -850,7 +833,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_commit(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -879,7 +862,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_tag(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -908,7 +891,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_branch(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -937,7 +920,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_e(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -970,7 +953,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_e_fork(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -1009,7 +992,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_e_multiple_remotes(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -1046,7 +1029,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_e_dirty(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -1086,7 +1069,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_e_commit(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -1120,7 +1103,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_e_tag(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -1154,7 +1137,7 @@ class TestPip(AcceptanceHelpers):
     def test_install_git_e_branch(self, capsys, tmpdir):
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
         self._pip_install(path, [
@@ -1190,7 +1173,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_git_repo(path)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
         self._pip_install(path, [TEST_TARBALL_PATH])
@@ -1216,7 +1199,7 @@ class TestPip(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_git_repo(path)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_WHEEL_PATH))
         self._pip_install(path, [TEST_WHEEL_PATH])
@@ -1245,7 +1228,7 @@ class TestSetupPy(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         with chdir(test_src):
@@ -1282,7 +1265,7 @@ class TestSetupPy(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         with chdir(test_src):
@@ -1319,7 +1302,7 @@ class TestEasyInstall(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._easy_install(path, [test_src])
@@ -1344,7 +1327,7 @@ class TestEasyInstall(AcceptanceHelpers):
         """regression test for issue #73"""
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
         self._easy_install(path, [TEST_TARBALL_PATH])
@@ -1371,7 +1354,7 @@ class TestEasyInstall(AcceptanceHelpers):
             pytest.skip("No egg for python version")
         path = str(tmpdir)
         self._make_venv(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
         self._easy_install(path, [TEST_TARBALL_PATH])
@@ -1397,7 +1380,7 @@ class TestEasyInstall(AcceptanceHelpers):
         self._make_venv(path)
         self._make_git_repo(path)
         test_src = self._git_clone_test()
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, test_src))
         self._easy_install(path, [test_src])
@@ -1423,7 +1406,7 @@ class TestEasyInstall(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         self._make_git_repo(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_TARBALL_PATH))
         self._easy_install(path, [TEST_TARBALL_PATH])
@@ -1451,7 +1434,7 @@ class TestEasyInstall(AcceptanceHelpers):
         path = str(tmpdir)
         self._make_venv(path)
         self._make_git_repo(path)
-        with capsys_disabled(capsys):
+        with capsys.disabled(capsys):
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, TEST_EGG_PATH))
         self._easy_install(path, [TEST_TARBALL_PATH])
