@@ -45,10 +45,13 @@ from contextlib import contextmanager
 from .versioninfo import VersionInfo
 
 try:
-    import pip
+    import pip._internal as pip
 except ImportError:
-    # this is used within try blocks; NBD if they fail
-    pass
+    try:
+        import pip
+    except (ImportError, KeyError):
+        # this is used within try blocks; NBD if they fail
+        pass
 
 try:
     import pkg_resources
