@@ -1,6 +1,12 @@
 Changelog
 =========
 
+
+0.1.3 (2018-03-18)
+------------------
+
+* Fix minor unhandled exception in previous release.
+
 0.1.2 (2018-03-18)
 ------------------
 

@@ -46,7 +46,7 @@ from .versioninfo import VersionInfo
 
 try:
     import pip._internal as pip
-except ImportError:
+except (ImportError, KeyError):
     try:
         import pip
     except (ImportError, KeyError):
