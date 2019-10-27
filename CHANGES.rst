@@ -4,6 +4,9 @@ Changelog
 Unreleased Changes
 ------------------
 
+**Important:**
+
+* Fix `Issue #7 <https://github.com/jantman/versionfinder/issues/7>`_ where certain new versions of pip throw an AttributeError on import if running in Lambda (or other environments where ``sys.stdin`` is ``None``).
 * Stop testing Python 3.3 and drop official support for it.
 * Multiple pip10 fixes.
 * Test fixes:

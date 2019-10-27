@@ -46,27 +46,33 @@ import warnings
 
 from .versioninfo import VersionInfo
 
+# Note: we catch all exceptions here because of
+# https://github.com/jantman/versionfinder/issues/7 - some pip versions
+# throw an import-time AttributeError when running in Lambda, or other
+# environments where sys.stdin is None. Per that issue, the right thing to
+# do is never fail if pip can't be imported.
+# This was fixed in https://github.com/pypa/pip/pull/7118 / pip 19.3
 try:
     from pip._internal.operations.freeze import FrozenRequirement
-except (ImportError, KeyError):
+except Exception:
     try:
         from pip._internal import FrozenRequirement
-    except (ImportError, KeyError):
+    except Exception:
         try:
             from pip import FrozenRequirement
-        except (ImportError, KeyError):
+        except Exception:
             # this is used within try blocks; NBD if they fail
             pass
 
 try:
     from pip._internal.utils.misc import get_installed_distributions
-except (ImportError, KeyError):
+except Exception:
     try:
         from pip._internal import get_installed_distributions
-    except (ImportError, KeyError):
+    except Exception:
         try:
             from pip import get_installed_distributions
-        except (ImportError, KeyError):
+        except Exception:
             # this is used within try blocks; NBD if they fail
             pass
 
