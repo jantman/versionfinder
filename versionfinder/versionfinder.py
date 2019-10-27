@@ -37,21 +37,44 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
+import sys
 import os
 import logging
 import inspect
 from contextlib import contextmanager
+import warnings
 
 from .versioninfo import VersionInfo
 
+# Note: we catch all exceptions here because of
+# https://github.com/jantman/versionfinder/issues/7 - some pip versions
+# throw an import-time AttributeError when running in Lambda, or other
+# environments where sys.stdin is None. Per that issue, the right thing to
+# do is never fail if pip can't be imported.
+# This was fixed in https://github.com/pypa/pip/pull/7118 / pip 19.3
 try:
-    import pip._internal as pip
-except (ImportError, KeyError):
+    from pip._internal.operations.freeze import FrozenRequirement
+except Exception:  # nocoverage
     try:
-        import pip
-    except (ImportError, KeyError):
-        # this is used within try blocks; NBD if they fail
-        pass
+        from pip._internal import FrozenRequirement
+    except Exception:
+        try:
+            from pip import FrozenRequirement
+        except Exception:
+            # this is used within try blocks; NBD if they fail
+            pass
+
+try:
+    from pip._internal.utils.misc import get_installed_distributions
+except Exception:  # nocoverage
+    try:
+        from pip._internal import get_installed_distributions
+    except Exception:
+        try:
+            from pip import get_installed_distributions
+        except Exception:
+            # this is used within try blocks; NBD if they fail
+            pass
 
 try:
     import pkg_resources
@@ -61,11 +84,15 @@ except ImportError:
 
 try:
     from git import Repo
-except Exception:
+except Exception:  # nocoverage
     # this is used within try blocks; NBD if they fail
     pass
 
 logger = logging.getLogger(__name__)
+
+warnings.filterwarnings(
+    action="always", category=DeprecationWarning, module=__name__
+)
 
 
 class VersionFinder(object):
@@ -120,6 +147,17 @@ class VersionFinder(object):
         logger.debug('package_dir: %s' % self.package_dir)
         self._pip_locations = []
         self._pkg_resources_locations = []
+        if (
+            sys.version_info[0] < 3 or
+            sys.version_info[0] == 3 and sys.version_info[1] < 5
+        ):  # nocoverage
+            warnings.warn(
+                'The versionfinder package no longer supports Python %d.%d; '
+                'please switch to Python 3.5 or newer.' % (
+                    sys.version_info[0], sys.version_info[1]
+                ),
+                DeprecationWarning
+            )
 
     def find_package_version(self):
         """
@@ -160,7 +198,10 @@ class VersionFinder(object):
             pip_info = self._find_pip_info()
         except Exception:
             # we NEVER want this to crash the program
-            logger.debug('Caught exception running _find_pip_info()')
+            logger.debug(
+                'Caught exception running _find_pip_info()',
+                exc_info=True
+            )
             pip_info = {}
         logger.debug("pip info: %s", pip_info)
         for k, v in pip_info.items():
@@ -234,7 +275,7 @@ class VersionFinder(object):
         dist = None
         dist_name = self.package_name.replace('_', '-')
         logger.debug('Checking for pip distribution named: %s', dist_name)
-        for d in pip.get_installed_distributions():
+        for d in get_installed_distributions():
             if d.project_name == dist_name:
                 dist = d
         if dist is None:
@@ -246,7 +287,10 @@ class VersionFinder(object):
         res['version'] = ver
         res['url'] = url
         # this is a bit of an ugly, lazy hack...
-        req = pip.FrozenRequirement.from_dist(dist, [])
+        try:
+            req = FrozenRequirement.from_dist(dist, [])
+        except TypeError:  # nocoverage
+            req = FrozenRequirement.from_dist(dist)
         logger.debug('pip FrozenRequirement: %s', req)
         res['requirement'] = str(req.req)
         return res

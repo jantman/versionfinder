@@ -243,7 +243,7 @@ class VersionInfo(object):
 
         If the distribution is installed via git and pip recognizes the git
         source, return the pip requirement string specifying the git URL and
-        commit, with an '*' appended if :py:attr:`~.git_is_dirty` is True.
+        commit, with an '*' appended if :py:meth:`~.git_is_dirty` is True.
 
         Otherwise, return a string of the form:
 
@@ -251,7 +251,7 @@ class VersionInfo(object):
 
         Where URL is the remote URL, ref is the tag name if the repo is checked
         out to a commit that matches a tag or else the commit hex SHA, and '*'
-        is appended if :py:attr:`~.git_is_dirty` is True.
+        is appended if :py:meth:`~.git_is_dirty` is True.
 
         :return: description of the git repo remote and state
         :rtype: str
@@ -283,7 +283,7 @@ class VersionInfo(object):
         """
         Return a long version and installation specifier string of the form:
 
-        If :py:attr:`~.git_str` == '':
+        If :py:meth:`~.git_str` == '':
 
             SHORT_STR
 
@@ -291,8 +291,8 @@ class VersionInfo(object):
 
             SHORT_STR (GIT_STR)
 
-        Where ``SHORT_STR`` is :py:attr:`~.short_str` and ``GIT_STR`` is
-        :py:attr:`~.git_str`.
+        Where ``SHORT_STR`` is :py:meth:`~.short_str` and ``GIT_STR`` is
+        :py:meth:`~.git_str`.
 
         :return: long version/installation specifier string
         :rtype: str

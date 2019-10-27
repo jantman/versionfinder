@@ -221,7 +221,7 @@ class AcceptanceHelpers(object):
                 'config',
                 'user.email'
             ]).strip()
-        except subprocess.CalledProcessError as ex:
+        except subprocess.CalledProcessError:
             res = None
         if res != '' and res is not None:
             print("Got git config user.email as %s" % res)

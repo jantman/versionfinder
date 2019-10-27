@@ -5,27 +5,23 @@ cache: pip
 
 matrix:
   include:
-    - python: "2.7"
-      env: TOXENV=py27-acceptance
-    - python: "3.3"
-      env: TOXENV=py33-acceptance
-    - python: "3.4"
-      env: TOXENV=py34-acceptance
     - python: "3.5"
       env: TOXENV=py35-acceptance
     - python: "3.6"
       env: TOXENV=py36-acceptance
-    - python: "2.7"
-      env: TOXENV=py27-unit
-    - python: "3.3"
-      env: TOXENV=py33-unit
-    - python: "3.4"
-      env: TOXENV=py34-unit
+    - python: "3.7"
+      env: TOXENV=py37-acceptance
+    - python: "3.8"
+      env: TOXENV=py38-acceptance
     - python: "3.5"
       env: TOXENV=py35-unit
     - python: "3.6"
       env: TOXENV=py36-unit
-    - python: "2.7"
+    - python: "3.7"
+      env: TOXENV=py37-unit
+    - python: "3.8"
+      env: TOXENV=py38-unit
+    - python: "3.7"
       env: TOXENV=docs
 
 install:

@@ -710,9 +710,9 @@ class TestFindPipInfo(BaseTest):
             req='foo==4.5.6'
         )
 
-        with patch('%s.pip.get_installed_distributions' % pbm
+        with patch('%s.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
+            with patch('%s.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
                 with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
@@ -734,9 +734,9 @@ class TestFindPipInfo(BaseTest):
             req='awslimitchecker==0.1.0'
         )
 
-        with patch('%s.pip.get_installed_distributions' % pbm
+        with patch('%s.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
+            with patch('%s.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
                 with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
@@ -760,9 +760,9 @@ class TestFindPipInfo(BaseTest):
             req=req_str
         )
 
-        with patch('%s.pip.get_installed_distributions' % pbm
+        with patch('%s.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
+            with patch('%s.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
                 with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
@@ -787,9 +787,9 @@ class TestFindPipInfo(BaseTest):
             req=req_str
         )
 
-        with patch('%s.pip.get_installed_distributions' % pbm
+        with patch('%s.get_installed_distributions' % pbm
                    ) as mock_pgid:
-            with patch('%s.pip.FrozenRequirement.from_dist' % pbm
+            with patch('%s.FrozenRequirement.from_dist' % pbm
                        ) as mock_from_dist:
                 with patch('%s._dist_version_url' % pb) as mock_dist_vu:
                     mock_pgid.return_value = installed_dists
