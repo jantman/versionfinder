@@ -12,4 +12,5 @@ exclude_lines =
     if sys.version_info.+
     raise NotImplementedError
     except ImportError:
+    except \(ImportError, KeyError\):
     .*# nocoverage.*

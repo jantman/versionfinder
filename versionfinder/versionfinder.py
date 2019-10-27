@@ -45,13 +45,28 @@ from contextlib import contextmanager
 from .versioninfo import VersionInfo
 
 try:
-    import pip._internal as pip
+    from pip._internal.operations.freeze import FrozenRequirement
 except (ImportError, KeyError):
     try:
-        import pip
+        from pip._internal import FrozenRequirement
     except (ImportError, KeyError):
-        # this is used within try blocks; NBD if they fail
-        pass
+        try:
+            from pip import FrozenRequirement
+        except (ImportError, KeyError):
+            # this is used within try blocks; NBD if they fail
+            pass
+
+try:
+    from pip._internal.utils.misc import get_installed_distributions
+except (ImportError, KeyError):
+    try:
+        from pip._internal import get_installed_distributions
+    except (ImportError, KeyError):
+        try:
+            from pip import get_installed_distributions
+        except (ImportError, KeyError):
+            # this is used within try blocks; NBD if they fail
+            pass
 
 try:
     import pkg_resources
@@ -61,7 +76,7 @@ except ImportError:
 
 try:
     from git import Repo
-except Exception:
+except Exception:  # nocoverage
     # this is used within try blocks; NBD if they fail
     pass
 
@@ -234,7 +249,7 @@ class VersionFinder(object):
         dist = None
         dist_name = self.package_name.replace('_', '-')
         logger.debug('Checking for pip distribution named: %s', dist_name)
-        for d in pip.get_installed_distributions():
+        for d in get_installed_distributions():
             if d.project_name == dist_name:
                 dist = d
         if dist is None:
@@ -246,7 +261,7 @@ class VersionFinder(object):
         res['version'] = ver
         res['url'] = url
         # this is a bit of an ugly, lazy hack...
-        req = pip.FrozenRequirement.from_dist(dist, [])
+        req = FrozenRequirement.from_dist(dist, [])
         logger.debug('pip FrozenRequirement: %s', req)
         res['requirement'] = str(req.req)
         return res
