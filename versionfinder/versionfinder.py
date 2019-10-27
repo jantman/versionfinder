@@ -147,10 +147,13 @@ class VersionFinder(object):
         logger.debug('package_dir: %s' % self.package_dir)
         self._pip_locations = []
         self._pkg_resources_locations = []
-        if sys.version_info[0] == 3 and sys.version_info[1] == 3:  # nocoverage
+        if (
+            sys.version_info[0] < 3 or
+            sys.version_info[0] == 3 and sys.version_info[1] < 5
+        ):  # nocoverage
             warnings.warn(
                 'The versionfinder package no longer supports Python %d.%d; '
-                'please switch to Python 2.7 or Python >= 3.4.' % (
+                'please switch to Python 3.5 or newer.' % (
                     sys.version_info[0], sys.version_info[1]
                 ),
                 DeprecationWarning

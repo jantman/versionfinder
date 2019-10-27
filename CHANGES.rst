@@ -4,10 +4,12 @@ Changelog
 Unreleased Changes
 ------------------
 
-**Important:**
+**Important:** in keeping with the scheduled end-of-life of various Python versions, versionfinder now only officially supports Python 3.5 or greater. A DeprecationWarning will be generated when run with versions before 3.5, and they are no longer tested.
 
 * Fix `Issue #7 <https://github.com/jantman/versionfinder/issues/7>`_ where certain new versions of pip throw an AttributeError on import if running in Lambda (or other environments where ``sys.stdin`` is ``None``).
 * Stop testing Python 3.3 and drop official support for it.
+* Stop testing Python 2.7 and 3.4.
+* Add DeprecationWarnings for any Python version < 3.5.
 * Multiple pip10 fixes.
 * Test fixes:
 
