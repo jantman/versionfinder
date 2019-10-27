@@ -1,6 +1,13 @@
 Changelog
 =========
 
+Unreleased Changes
+------------------
+
+* Stop testing Python 3.3 and drop official support for it.
+* Test fixes:
+
+  * Always install latest versions of ``coverage`` and ``pytest``.
 
 0.1.3 (2018-03-18)
 ------------------

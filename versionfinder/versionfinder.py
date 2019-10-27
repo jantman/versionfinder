@@ -37,10 +37,12 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 ################################################################################
 """
 
+import sys
 import os
 import logging
 import inspect
 from contextlib import contextmanager
+import warnings
 
 from .versioninfo import VersionInfo
 
@@ -81,6 +83,10 @@ except Exception:  # nocoverage
     pass
 
 logger = logging.getLogger(__name__)
+
+warnings.filterwarnings(
+    action="always", category=DeprecationWarning, module=__name__
+)
 
 
 class VersionFinder(object):
@@ -135,6 +141,14 @@ class VersionFinder(object):
         logger.debug('package_dir: %s' % self.package_dir)
         self._pip_locations = []
         self._pkg_resources_locations = []
+        if sys.version_info[0] == 3 and sys.version_info[1] == 3:  # nocoverage
+            warnings.warn(
+                'The versionfinder package no longer supports Python %d.%d; '
+                'please switch to Python 2.7 or Python >= 3.4.' % (
+                    sys.version_info[0], sys.version_info[1]
+                ),
+                DeprecationWarning
+            )
 
     def find_package_version(self):
         """
