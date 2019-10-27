@@ -165,7 +165,7 @@ Guidelines
 Testing
 -------
 
-Testing is done via `pytest <http://pytest.org/latest/>`_, driven by `tox <https://tox.readthedocs.org/>`_.
+Testing is done via `pytest <https://docs.pytest.org/en/latest/>`_, driven by `tox <https://tox.readthedocs.org/>`_.
 
 * testing is as simple as:
 
