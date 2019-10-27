@@ -54,7 +54,7 @@ from .versioninfo import VersionInfo
 # This was fixed in https://github.com/pypa/pip/pull/7118 / pip 19.3
 try:
     from pip._internal.operations.freeze import FrozenRequirement
-except Exception:
+except Exception:  # nocoverage
     try:
         from pip._internal import FrozenRequirement
     except Exception:
@@ -66,7 +66,7 @@ except Exception:
 
 try:
     from pip._internal.utils.misc import get_installed_distributions
-except Exception:
+except Exception:  # nocoverage
     try:
         from pip._internal import get_installed_distributions
     except Exception:
