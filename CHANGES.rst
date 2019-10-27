@@ -5,9 +5,11 @@ Unreleased Changes
 ------------------
 
 * Stop testing Python 3.3 and drop official support for it.
+* Multiple pip10 fixes.
 * Test fixes:
 
   * Always install latest versions of ``coverage`` and ``pytest``.
+  * Switch docs build to py37
 
 0.1.3 (2018-03-18)
 ------------------
