@@ -2,9 +2,9 @@ versionfinder package
 =====================
 
 .. automodule:: versionfinder
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Submodules
 ----------
@@ -14,4 +14,3 @@ Submodules
    versionfinder.version
    versionfinder.versionfinder
    versionfinder.versioninfo
-

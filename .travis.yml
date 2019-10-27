@@ -21,7 +21,7 @@ matrix:
       env: TOXENV=py35-unit
     - python: "3.6"
       env: TOXENV=py36-unit
-    - python: "2.7"
+    - python: "3.7"
       env: TOXENV=docs
 
 install:
