@@ -189,7 +189,10 @@ class VersionFinder(object):
             pip_info = self._find_pip_info()
         except Exception:
             # we NEVER want this to crash the program
-            logger.debug('Caught exception running _find_pip_info()')
+            logger.debug(
+                'Caught exception running _find_pip_info()',
+                exc_info=True
+            )
             pip_info = {}
         logger.debug("pip info: %s", pip_info)
         for k, v in pip_info.items():
@@ -275,7 +278,10 @@ class VersionFinder(object):
         res['version'] = ver
         res['url'] = url
         # this is a bit of an ugly, lazy hack...
-        req = FrozenRequirement.from_dist(dist, [])
+        try:
+            req = FrozenRequirement.from_dist(dist, [])
+        except TypeError:  # nocoverage
+            req = FrozenRequirement.from_dist(dist)
         logger.debug('pip FrozenRequirement: %s', req)
         res['requirement'] = str(req.req)
         return res
