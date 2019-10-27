@@ -13,6 +13,10 @@ matrix:
       env: TOXENV=py35-acceptance
     - python: "3.6"
       env: TOXENV=py36-acceptance
+    - python: "3.7"
+      env: TOXENV=py37-acceptance
+    - python: "3.8"
+      env: TOXENV=py38-acceptance
     - python: "2.7"
       env: TOXENV=py27-unit
     - python: "3.4"
@@ -21,6 +25,10 @@ matrix:
       env: TOXENV=py35-unit
     - python: "3.6"
       env: TOXENV=py36-unit
+    - python: "3.7"
+      env: TOXENV=py37-unit
+    - python: "3.8"
+      env: TOXENV=py38-unit
     - python: "3.7"
       env: TOXENV=docs
 

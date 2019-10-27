@@ -10,6 +10,7 @@ Unreleased Changes
 
   * Always install latest versions of ``coverage`` and ``pytest``.
   * Switch docs build to py37
+  * Begin testing under py37 and py38
 
 0.1.3 (2018-03-18)
 ------------------
