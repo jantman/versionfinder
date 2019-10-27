@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Unreleased Changes
+1.0.0 (2019-10-27)
 ------------------
 
 **Important:** in keeping with the scheduled end-of-life of various Python versions, versionfinder now only officially supports Python 3.5 or greater. A DeprecationWarning will be generated when run with versions before 3.5, and they are no longer tested.
