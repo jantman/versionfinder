@@ -93,11 +93,18 @@ class TestInit(object):
 
     def test_init(self):
         m_pip_logger = Mock()
+        m_pip_s_logger = Mock()
+
+        def se_get_logger(lname):
+            if lname == 'pip':
+                return m_pip_logger
+            if lname == 'pip.subprocessor':
+                return m_pip_s_logger
         with patch('%s.inspect.stack' % pbm, autospec=True) as m_stack:
             with patch('%s.logger' % pbm, autospec=True) as m_logger:
                 with patch('%s.logging.getLogger' % pbm,
-                           autospec=True) as m_log_pip:
-                    m_log_pip.return_value = m_pip_logger
+                           autospec=True) as m_get_log:
+                    m_get_log.side_effect = se_get_logger
                     cls = VersionFinder('foobar',
                                         package_file='/foo/bar/baz.py')
         assert m_stack.mock_calls == []
@@ -110,8 +117,9 @@ class TestInit(object):
             call.debug('Explicit package file: %s', '/foo/bar/baz.py'),
             call.debug('package_dir: /foo/bar')
         ]
-        assert m_log_pip.mock_calls == [call('pip')]
+        assert m_get_log.mock_calls == [call('pip'), call('pip.subprocessor')]
         assert m_pip_logger.mock_calls == [call.setLevel(logging.CRITICAL)]
+        assert m_pip_s_logger.mock_calls == []
 
     def test_init_log_true(self):
         m_pip_logger = Mock()
