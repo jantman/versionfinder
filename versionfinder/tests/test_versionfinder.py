@@ -38,26 +38,18 @@ Jason Antman <jason@jasonantman.com> <http://www.jasonantman.com>
 """
 
 import pytest
-import sys
 from pip._vendor.packaging.version import Version
 from git import Repo
 
 from versionfinder.versionfinder import (VersionFinder, chdir)
 from versionfinder.versioninfo import VersionInfo
 
+from unittest.mock import (
+    patch, call, DEFAULT, Mock, PropertyMock, MagicMock
+)
+
 import logging
 logger = logging.getLogger(__name__)
-
-# https://code.google.com/p/mock/issues/detail?id=249
-# py>=3.4 should use unittest.mock not the mock package on pypi
-if (
-        sys.version_info[0] < 3 or
-        sys.version_info[0] == 3 and sys.version_info[1] < 4
-):
-    from mock import patch, call, DEFAULT, Mock, PropertyMock, MagicMock
-else:
-    from unittest.mock import (
-        patch, call, DEFAULT, Mock, PropertyMock, MagicMock)
 
 pbm = 'versionfinder.versionfinder'
 pb = '%s.VersionFinder' % pbm

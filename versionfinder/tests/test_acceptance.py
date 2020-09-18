@@ -53,11 +53,7 @@ import requests
 import logging
 from versionfinder.versionfinder import chdir
 from tempfile import mkdtemp
-
-if sys.version_info >= (3, 3):
-    from subprocess import DEVNULL
-else:  # unreachable under 3.4+ - pragma: no cover
-    DEVNULL = open(os.devnull, 'wb')
+from subprocess import DEVNULL
 
 logger = logging.getLogger(__name__)
 

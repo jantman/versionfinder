@@ -6,7 +6,11 @@ Changelog
 
 * Switch GitPython requirement from ``>=2.1.0,<2.2.0`` to ``~=3.1``.
 * Correct docs to clarify that this package now needs Python >= 3.5.
-* Switch tests from deprecated pep8 / pytest-pep8 to pycodestyle / pytest-pycodestyle.
+* Numerous testing changes:
+
+  * Switch tests from deprecated pep8 / pytest-pep8 to pycodestyle / pytest-pycodestyle.
+  * Code style fixes for using pycodestyle
+  * Remove py27 and py34 test support
 
 1.0.0 (2019-10-27)
 ------------------
