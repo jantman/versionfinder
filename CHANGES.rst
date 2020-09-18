@@ -1,6 +1,13 @@
 Changelog
 =========
 
+1.1.0 (2020-09-18)
+------------------
+
+* Switch GitPython requirement from ``>=2.1.0,<2.2.0`` to ``~=3.1``.
+* Correct docs to clarify that this package now needs Python >= 3.5.
+* Switch tests from deprecated pep8 / pytest-pep8 to pycodestyle / pytest-pycodestyle.
+
 1.0.0 (2019-10-27)
 ------------------
 
