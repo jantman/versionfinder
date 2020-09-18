@@ -53,11 +53,7 @@ import requests
 import logging
 from versionfinder.versionfinder import chdir
 from tempfile import mkdtemp
-
-if sys.version_info >= (3, 3):
-    from subprocess import DEVNULL
-else:  # unreachable under 3.4+ - pragma: no cover
-    DEVNULL = open(os.devnull, 'wb')
+from subprocess import DEVNULL
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +127,7 @@ def _check_output(args, stderr=None, env=None):
     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=stderr, env=env)
     (res, err) = p.communicate()
     if p.returncode != 0:
-        print("Command %s OUT/ERR:\n%s", args, res)
+        print("Command %s OUT/ERR:\n%s\n%s", args, res, err)
         raise subprocess.CalledProcessError(p.returncode, args)
     if not isinstance(res, type("")):
         res = res.decode('utf-8')
@@ -364,13 +360,15 @@ class AcceptanceHelpers(object):
         """create a git repo under path; return the commit"""
         print_header("creating git repository in %s" % path)
         with chdir(path):
-            _check_output(['git', 'init', '.'])
+            _check_output(['git', 'init', '.'], stderr=subprocess.PIPE)
             self._set_git_config()
             with open('foo', 'w') as fh:
                 fh.write('foo')
-            _check_output(['git', 'add', 'foo'])
+            _check_output(['git', 'add', '-f', 'foo'], stderr=subprocess.PIPE)
             self._set_git_config(set_in_travis=True)
-            _check_output(['git', 'commit', '-m', 'foo'])
+            _check_output(
+                ['git', 'commit', '-m', 'foo'], stderr=subprocess.PIPE
+            )
             commit = _get_git_commit()
             print_header("git repository in %s commit: %s" % (path, commit))
         return commit
@@ -478,7 +476,8 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ file://%s' % test_src,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -686,7 +685,8 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ file://%s' % TEST_TARBALL_PATH,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -740,7 +740,8 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ file://%s' % TEST_WHEEL_PATH,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -766,7 +767,8 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ file://%s' % TEST_WHEEL_PATH,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -779,11 +781,8 @@ class TestPip(AcceptanceHelpers):
         with capsys.disabled():
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
-        self._pip_install(path, [
-            'git+%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL
-            )
-        ])
+        git_url = 'git+%s#egg=versionfinder-test-pkg' % TEST_GIT_HTTPS_URL
+        self._pip_install(path, [git_url])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -794,7 +793,10 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ git+%s@%s' % (
+                        TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                    ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -807,11 +809,8 @@ class TestPip(AcceptanceHelpers):
         with capsys.disabled():
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
-        self._pip_install(path, [
-            'git+%s#egg=versionfinder-test-pkg' % (
-                TEST_FORK_HTTPS_URL
-            )
-        ])
+        git_url = 'git+%s#egg=versionfinder-test-pkg' % TEST_FORK_HTTPS_URL
+        self._pip_install(path, [git_url])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -822,7 +821,10 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ git+%s@%s' % (
+                        TEST_FORK_HTTPS_URL, TEST_MASTER_COMMIT
+                    ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -835,12 +837,11 @@ class TestPip(AcceptanceHelpers):
         with capsys.disabled():
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
-        self._pip_install(path, [
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_MASTER_COMMIT
-            )
-        ])
+        git_url = 'git+%s@%s#egg=versionfinder-test-pkg' % (
+            TEST_GIT_HTTPS_URL,
+            TEST_MASTER_COMMIT
+        )
+        self._pip_install(path, [git_url])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -851,7 +852,10 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ git+%s@%s' % (
+                        TEST_GIT_HTTPS_URL, TEST_MASTER_COMMIT
+                    ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -864,12 +868,11 @@ class TestPip(AcceptanceHelpers):
         with capsys.disabled():
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
-        self._pip_install(path, [
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_TAG
-            )
-        ])
+        git_url = 'git+%s@%s#egg=versionfinder-test-pkg' % (
+            TEST_GIT_HTTPS_URL,
+            TEST_TAG
+        )
+        self._pip_install(path, [git_url])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -880,7 +883,10 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ git+%s@%s' % (
+                        TEST_GIT_HTTPS_URL, TEST_TAG_COMMIT
+                    ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -893,12 +899,11 @@ class TestPip(AcceptanceHelpers):
         with capsys.disabled():
             print("\n%s() venv=%s src=%s" % (
                 inspect.stack()[0][0].f_code.co_name, path, 'git'))
-        self._pip_install(path, [
-            'git+%s@%s#egg=versionfinder-test-pkg' % (
-                TEST_GIT_HTTPS_URL,
-                TEST_BRANCH
-            )
-        ])
+        git_url = 'git+%s@%s#egg=versionfinder-test-pkg' % (
+            TEST_GIT_HTTPS_URL,
+            TEST_BRANCH
+        )
+        self._pip_install(path, [git_url])
         actual = self._get_result(self._get_version(path))
         expected = {
             'failed': False,
@@ -909,7 +914,10 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ git+%s@%s' % (
+                        TEST_GIT_HTTPS_URL, TEST_BRANCH_COMMIT
+                    ),
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1186,7 +1194,8 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ file://%s' % TEST_TARBALL_PATH,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
@@ -1212,7 +1221,8 @@ class TestPip(AcceptanceHelpers):
                 'git_is_dirty': None,
                 'pip_version': TEST_VERSION,
                 'pip_url': TEST_PROJECT_URL,
-                'pip_requirement': 'versionfinder-test-pkg==%s' % TEST_VERSION,
+                'pip_requirement':
+                    'versionfinder-test-pkg @ file://%s' % TEST_WHEEL_PATH,
                 'pkg_resources_version': TEST_VERSION,
                 'pkg_resources_url': TEST_PROJECT_URL,
             }
