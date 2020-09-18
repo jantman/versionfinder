@@ -118,8 +118,9 @@ class VersionFinder(object):
         :type package_file: str
         :param log: If not set to True, the "versionfinder" and "pip" loggers
           will be set to a level of :py:const:`logging.CRITICAL` to suppress
-          log output. If set to True, you will see a LOT of debug-level log
-          output, for debugging the internals of versionfinder.
+          log output. The "pip.subprocessor" logger will be completely disabled.
+          If set to True, you will see a LOT of debug-level log output, for
+          debugging the internals of versionfinder.
         :type log: bool
         :param caller_frame: If the call to this method is wrapped by something
           else, this should be the stack frame representing the original caller.
@@ -132,6 +133,8 @@ class VersionFinder(object):
             pip_log = logging.getLogger("pip")
             pip_log.setLevel(logging.CRITICAL)
             pip_log.propagate = True
+            pip_s_log = logging.getLogger('pip.subprocessor')
+            pip_s_log.disabled = True
         logger.debug("Finding package version for: %s", package_name)
         self.package_name = package_name
         if package_file is not None:
