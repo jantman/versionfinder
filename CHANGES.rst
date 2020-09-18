@@ -11,6 +11,7 @@ Changelog
   * Switch tests from deprecated pep8 / pytest-pep8 to pycodestyle / pytest-pycodestyle.
   * Code style fixes for using pycodestyle
   * Remove py27 and py34 test support
+  * Update acceptance tests for pip 20
 
 1.0.0 (2019-10-27)
 ------------------
