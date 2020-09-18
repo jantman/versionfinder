@@ -1,6 +1,11 @@
 Changelog
 =========
 
+1.1.1 (2020-09-18)
+------------------
+
+* Unless :py:class:`~.VersionFinder` is constructed with the ``log=True`` option, completely disable the ``pip.subprocessor`` logger. This will suppress annoying critical-level log messages generated on systems which do not have ``git`` in the PATH.
+
 1.1.0 (2020-09-18)
 ------------------
 
