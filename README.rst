@@ -1,6 +1,10 @@
 versionfinder
 =============
 
+.. image:: https://img.shields.io/pypi/v/versionfinder.svg
+   :target: https://pypi.python.org/pypi/versionfinder
+   :alt: PyPi package version
+
 .. image:: https://img.shields.io/github/forks/jantman/versionfinder.svg
    :alt: GitHub Forks
    :target: https://github.com/jantman/versionfinder/network
