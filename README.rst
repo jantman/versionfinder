@@ -25,6 +25,10 @@ versionfinder
    :alt: Project Status: Active – The project has reached a stable, usable state and is being actively developed.
    :target: http://www.repostatus.org/#active
 
+.. image:: https://img.shields.io/conda/v/conda-forge/versionfinder
+   :alt: Conda
+   :target: https://anaconda.org/conda-forge/versionfinder
+
 Python package to find the version of another package/distribution, whether installed via pip, setuptools or git
 
 Overview
