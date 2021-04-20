@@ -1,6 +1,10 @@
 versionfinder
 =============
 
+.. image:: https://img.shields.io/pypi/v/versionfinder.svg
+   :target: https://pypi.python.org/pypi/versionfinder
+   :alt: PyPi package version
+
 .. image:: https://img.shields.io/github/forks/jantman/versionfinder.svg
    :alt: GitHub Forks
    :target: https://github.com/jantman/versionfinder/network
@@ -24,6 +28,10 @@ versionfinder
 .. image:: http://www.repostatus.org/badges/latest/active.svg
    :alt: Project Status: Active – The project has reached a stable, usable state and is being actively developed.
    :target: http://www.repostatus.org/#active
+
+.. image:: https://img.shields.io/conda/v/conda-forge/versionfinder
+   :alt: Conda
+   :target: https://anaconda.org/conda-forge/versionfinder
 
 Python package to find the version of another package/distribution, whether installed via pip, setuptools or git
 
